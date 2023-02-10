@@ -2,6 +2,8 @@ import re
 import numpy as np
 from pprint import pprint
 
+ngramDicts = {}
+
 
 def get_token_list(path: str) -> list:
     in_text = open(path, "r")
@@ -29,4 +31,28 @@ def get_token_list(path: str) -> list:
     return in_text.split()
 
 
-print(get_token_list("corpus/Pride and Prejudice - Jane Austen.txt"))
+def construct_ngram(n: int, token_list: list) -> dict:
+    ngram_dict = {}
+    # save it in trie structure
+    for i in range(len(token_list) - n + 1):
+        ngram_to_check = token_list[i:i + n]
+        curdict = ngram_dict
+        for j in range(n):
+            if ngram_to_check[j] not in curdict:
+                if j == n - 1:
+                    curdict[ngram_to_check[j]] = 1
+                else:
+                    curdict[ngram_to_check[j]] = {}
+            else:
+                if j == n - 1:
+                    curdict[ngram_to_check[j]] += 1
+            curdict = curdict[ngram_to_check[j]]
+
+    return ngram_dict
+
+
+tokens = get_token_list("corpus/Pride and Prejudice - Jane Austen.txt")
+for i in range(4):
+    ngramDicts[i + 1] = construct_ngram(i + 1, tokens)
+
+pprint(ngramDicts)
