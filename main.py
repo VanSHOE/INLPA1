@@ -65,75 +65,70 @@ def construct_ngram(n: int, token_list: list) -> dict:
     return ngram_dict
 
 
-def dfs_count(ngram_dict: dict, n: int) -> int:
+def dfs_count(ngram_dict: dict) -> int:
     """
     Performs a depth first search on the input n-gram dictionary to count the number of n-grams
     :param ngram_dict: n-gram dictionary
-    :param n: n-gram size
     :return: number of n-grams
     """
     count = 0
     for key, value in ngram_dict.items():
         if isinstance(value, dict):
-            count += dfs_count(value, n)
+            count += dfs_count(value)
         else:
             count += 1
     return count
 
 
-def kneser_ney_smoothing(ngram_dict: dict, h_n: int, n: int, d: float, ngram: list) -> float:
+def ngram_count(ngram_dict: dict, ngram: list) -> int:
+    """
+    Returns the count of the input n-gram
+    :param ngram_dict: n-gram dictionary
+    :param ngram: n-gram to be counted
+    :return: count of the n-gram
+    """
+    cur_dict = ngram_dict[len(ngram)]
+    for i in range(len(ngram)):
+        if ngram[i] in cur_dict:
+            cur_dict = cur_dict[ngram[i]]
+        else:
+            return 0
+    return cur_dict
+
+
+def kneser_ney_smoothing(ngram_dict: dict, d: float, ngram: list) -> float:
     """
     Performs Kneser-Ney smoothing on the input n-gram dictionary
     :param ngram_dict: n-gram dictionary
-    :param h_n: Maximum order of ngram
-    :param n: n-gram size
     :param d: discounting factor
     :param ngram: n-gram to be smoothed
     :return: smoothed probability
     """
-
-    if n == h_n:
+    if len(ngram) == 1:
+        denom = dfs_count(ngram_dict[2])
+        # count all bigrams ending with ngram[-1]
         count = 0
-        # traverse ngram_dict tree to find count
-        cur_dict = ngram_dict[n]
-        for i in range(n):
-            if ngram[i] in cur_dict:
-                count = cur_dict[ngram[i]]
-            else:
-                count = 0
-                break
+        for key, value in ngram_dict[2].items():
+            if key == ngram[-1]:
+                count += dfs_count(value)
+
+        return count / denom
+
+    try:
+        first = max(ngram_count(ngram_dict, ngram) - d, 0) / ngram_count(ngram_dict, ngram[:-1])
+    except ZeroDivisionError:
+        return 0
+
+    try:
+        cur_dict = ngram_dict[len(ngram)]
+        # len of ngram - 1
+        for i in range(len(ngram) - 1):
             cur_dict = cur_dict[ngram[i]]
-
-        denomCount = 0
-        # traverse ngram_dict tree to find denomCount
-        cur_dict = ngram_dict[n - 1]
-        for i in range(n - 1):
-            if ngram[i] in cur_dict:
-                denomCount = cur_dict[ngram[i]]
-            else:
-                denomCount = 0
-                break
-            cur_dict = cur_dict[ngram[i]]
-
-        if denomCount == 0:
-            return kneser_ney_smoothing(ngram_dict, h_n, n - 1, d, ngram[1:])
-
-        numerator = count
-        denominator = denomCount
-        return numerator / denominator
-
-    historyCount = 0
-    # traverse ngram_dict tree to find historyCount
-    cur_dict = ngram_dict[n - 1]
-    for i in range(n - 1):
-        if ngram[i] in cur_dict:
-            historyCount = cur_dict[ngram[i]]
-        else:
-            historyCount = 0
-            break
-        cur_dict = cur_dict[ngram[i]]
-
-    lmbda = d / historyCount
+        second_rhs = len(cur_dict)
+    except KeyError:
+        second_rhs = 0
+    second = d * second_rhs / ngram_count(ngram_dict, ngram[:-1])
+    return first + second * kneser_ney_smoothing(ngram_dict, d, ngram[1:])
 
 
 tokens = get_token_list("corpus/Pride and Prejudice - Jane Austen.txt")
@@ -141,4 +136,5 @@ tokens = get_token_list("corpus/Pride and Prejudice - Jane Austen.txt")
 for n in range(NGRAM_SIZE):
     ngramDicts[n + 1] = construct_ngram(n + 1, tokens)
 
-pprint(ngramDicts[3])
+print(kneser_ney_smoothing(ngramDicts, 0.75, ['between', 'him', 'and', 'sensibility']))
+print(kneser_ney_smoothing(ngramDicts, 0.75, ['between', 'and', 'him', 'darcy']))
