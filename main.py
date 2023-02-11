@@ -150,10 +150,12 @@ def kneser_ney_smoothing(ngram_dict: dict, d: float, ngram: list) -> float:
         denom = dfs_count(ngram_dict[2])
         # count all bigrams ending with ngram[-1]
         count = 0
-        for key, value in ngram_dict[2].items():
-            if key == ngram[-1]:
-                count += dfs_count(value)
 
+        for key, value in ngram_dict[2].items():
+            if ngram[-1] in value:
+                count += 1
+
+        print(f'Count: {count}, Denom: {denom}')
         return count / denom
 
     try:
@@ -170,11 +172,38 @@ def kneser_ney_smoothing(ngram_dict: dict, d: float, ngram: list) -> float:
     except KeyError:
         second_rhs = 0
     second = d * second_rhs / ngram_count(ngram_dict, ngram[:-1])
+
     return first + second * kneser_ney_smoothing(ngram_dict, d, ngram[1:])
 
 
-# tokens = get_token_list("corpus/Pride and Prejudice - Jane Austen.txt")
-tokens = get_token_list('corpus/Ulysses - James Joyce.txt')
+def witten_bell_smoothing(ngram_dict: dict, ngram: list) -> float:
+    """
+    Performs Witten-Bell smoothing on the input n-gram dictionary
+    :param ngram_dict: n-gram dictionary
+    :param ngram: n-gram to be smoothed
+    :return: smoothed probability
+    """
+    # replace unknown in ngram with <UNK>
+    for i in range(len(ngram)):
+        ngram[i] = ngram[i].lower()
+        if ngram[i] not in ngram_dict[1]:
+            ngram[i] = '<UNK>'
+
+    try:
+        cur_dict = ngram_dict[len(ngram)]
+        # len of ngram - 1
+        for i in range(len(ngram) - 1):
+            cur_dict = cur_dict[ngram[i]]
+        lambdaInvNum = len(cur_dict)
+    except KeyError:
+        lambdaInvNum = 0
+
+    lambdaInvNum = lambdaInvNum / (lambdaInvNum + ngram_count(ngram_dict, ngram[:-1]))
+    lambd = 1 - lambdaInvNum
+
+
+tokens = get_token_list("corpus/Pride and Prejudice - Jane Austen.txt")
+# tokens = get_token_list('corpus/Ulysses - James Joyce.txt')
 for n in range(NGRAM_SIZE):
     ngramDicts[n + 1] = construct_ngram(n + 1, tokens)
 # print(tokens)
