@@ -6,15 +6,15 @@ NGRAM_SIZE = 4
 ngramDicts = {}
 
 
-def get_token_list(path: str) -> list:
+def get_token_list(in_text: str) -> list:
     """
     Tokenizes the input text file
     :param path: path to the input text file
     :return: list of tokens
     """
-    in_text = open(path, "r", encoding="utf-8")
+
     # lower case it
-    in_text = in_text.read().lower()
+    in_text = in_text.lower()
     # tokenize hashtags
     in_text = re.sub(r"#(\w+)", r"<HASHTAG> ", in_text)
     # tokenize mentions
@@ -36,7 +36,7 @@ def get_token_list(path: str) -> list:
     in_text = in_text.replace('<', ' <')
     in_text = in_text.replace('>', '> ')
 
-    return rem_low_freq(in_text.split(), 1)
+    return in_text.split()
 
 
 def rem_low_freq(tokens: list, threshold: int) -> list:
@@ -208,24 +208,62 @@ def witten_bell_smoothing(ngram_dict: dict, ngram: list) -> float:
 
     first_term = lambd * ngram_count(ngram_dict, ngram) / ngram_count(ngram_dict, ngram[:-1])
     second_term = lambda_inv_num * witten_bell_smoothing(ngram_dict, ngram[1:])
+
     return first_term + second_term
 
 
-tokens = get_token_list("corpus/Pride and Prejudice - Jane Austen.txt")
-# tokens = get_token_list('corpus/Ulysses - James Joyce.txt')
-for n in range(NGRAM_SIZE):
-    ngramDicts[n + 1] = construct_ngram(n + 1, tokens)
-# print(tokens)
-print(kneser_ney_smoothing(ngramDicts, 0.75, ['between', 'him', 'and', 'rahul']))
-print(kneser_ney_smoothing(ngramDicts, 0.75, ['between', 'him', 'and', 'Darcy']))
-print(kneser_ney_smoothing(ngramDicts, 0.75, ['between', 'and', 'him', 'Darcy']))
-print(kneser_ney_smoothing(ngramDicts, 0.75, ['My', 'name', 'is', 'Rahul']))
-print(kneser_ney_smoothing(ngramDicts, 0.75, "start of the nothing".split()))
+def sentence_likelihood(ngram_dict: dict, sentence: str, smoothing: str, kneserd=0.75) -> float:
+    """
+    Calculates the likelihood of the input sentence
+    :param ngram_dict: n-gram dictionary
+    :param sentence: input sentence
+    :param smoothing: smoothing method
+    :param kneserd: discounting factor for Kneser-Ney smoothing
+    :return: likelihood of the sentence
+    """
+    tokens = get_token_list(sentence)
+    if smoothing == 'wb':
+        likelihood = 1
+        for i in range(len(tokens) - NGRAM_SIZE + 1):
+            likelihood *= witten_bell_smoothing(ngram_dict, tokens[i:i + NGRAM_SIZE])
+        return likelihood
+    elif smoothing == 'kn':
+        likelihood = 1
+        for i in range(len(tokens) - NGRAM_SIZE + 1):
+            likelihood *= kneser_ney_smoothing(ngram_dict, kneserd, tokens[i:i + NGRAM_SIZE])
+        return likelihood
 
-print("WittenBell")
-# same for witten bell
-print(witten_bell_smoothing(ngramDicts, ['between', 'him', 'and', 'rahul']))
-print(witten_bell_smoothing(ngramDicts, ['between', 'him', 'and', 'Darcy']))
-print(witten_bell_smoothing(ngramDicts, ['between', 'and', 'him', 'Darcy']))
-print(witten_bell_smoothing(ngramDicts, ['My', 'name', 'is', 'Rahul']))
-print(witten_bell_smoothing(ngramDicts, "start of the nothing".split()))
+
+if __name__ == '__main__':
+    path = "corpus/Pride and Prejudice - Jane Austen.txt"
+    in_text = open(path, "r", encoding="utf-8")
+    tokens = rem_low_freq(get_token_list(in_text.read()), 1)
+
+    for n in range(NGRAM_SIZE):
+        ngramDicts[n + 1] = construct_ngram(n + 1, tokens)
+    # print(tokens)
+    # print(kneser_ney_smoothing(ngramDicts, 0.75, ['between', 'him', 'and', 'rahul']))
+    # print(kneser_ney_smoothing(ngramDicts, 0.75, ['between', 'him', 'and', 'Darcy']))
+    # print(kneser_ney_smoothing(ngramDicts, 0.75, ['between', 'and', 'him', 'Darcy']))
+    # print(kneser_ney_smoothing(ngramDicts, 0.75, ['My', 'name', 'is', 'Rahul']))
+    # print(kneser_ney_smoothing(ngramDicts, 0.75, "start of the nothing".split()))
+    #
+    # print("WittenBell")
+    # # same for witten bell
+    # print(witten_bell_smoothing(ngramDicts, ['between', 'him', 'and', 'rahul']))
+    # print(witten_bell_smoothing(ngramDicts, ['between', 'him', 'and', 'Darcy']))
+    # print(witten_bell_smoothing(ngramDicts, ['between', 'and', 'him', 'Darcy']))
+    # print(witten_bell_smoothing(ngramDicts, ['My', 'name', 'is', 'Rahul']))
+    # print(witten_bell_smoothing(ngramDicts, "start of the nothing".split()))
+
+    print("Sentence: start of the nothing")
+    print(sentence_likelihood(ngramDicts, "start of the nothing", 'wb'))
+    print(sentence_likelihood(ngramDicts, "start of the nothing", 'kn'))
+
+    print("Sentence: between him and rahul")
+    print(sentence_likelihood(ngramDicts, "between him and darcy and darcy", 'wb'))
+    print(sentence_likelihood(ngramDicts, "between him and darcy and darcy", 'kn'))
+
+    print("Sentence: between him and Darcy")
+    print(sentence_likelihood(ngramDicts, "between him and Darcy he was the best", 'wb'))
+    print(sentence_likelihood(ngramDicts, "between him and Darcy he was the best", 'kn'))
