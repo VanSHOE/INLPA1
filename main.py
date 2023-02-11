@@ -1,6 +1,9 @@
 import re
 import numpy as np
 from pprint import pprint
+import random
+import time
+from alive_progress import alive_bar
 
 NGRAM_SIZE = 4
 ngramDicts = {}
@@ -9,7 +12,7 @@ ngramDicts = {}
 def get_token_list(in_text: str) -> list:
     """
     Tokenizes the input text file
-    :param path: path to the input text file
+    :param in_text: input text
     :return: list of tokens
     """
 
@@ -234,36 +237,69 @@ def sentence_likelihood(ngram_dict: dict, sentence: str, smoothing: str, kneserd
         return likelihood
 
 
+def perplexity(ngram_dict: dict, sentence: str, smoothing: str, kneserd=0.75) -> float:
+    """
+    Calculates the perplexity of the input sentence
+    :param ngram_dict: n-gram dictionary
+    :param sentence: input sentence
+    :param smoothing: smoothing method
+    :param kneserd: discounting factor for Kneser-Ney smoothing
+    :return: perplexity of the sentence
+    """
+    prob = sentence_likelihood(ngram_dict, sentence, smoothing, kneserd)
+    # print(sentence, prob)
+    prob = max(prob, 1e-10)
+
+    return pow(prob, -1 / len(get_token_list(sentence)))
+
+
 if __name__ == '__main__':
-    path = "corpus/Pride and Prejudice - Jane Austen.txt"
+    # path = "corpus/Pride and Prejudice - Jane Austen.txt"
+    path = "corpus/Ulysses - James Joyce.txt"
     in_text = open(path, "r", encoding="utf-8")
-    tokens = rem_low_freq(get_token_list(in_text.read()), 1)
+    sentences = in_text.readlines()
+    random.seed(time.time())
+    random_sentences = random.sample(sentences, 1000)
+    in_text.close()
+
+    in_text = open(path, "r", encoding="utf-8")
+    trainLines = in_text.readlines()
+    # remove test lines from training lines
+
+    for sentence in random_sentences:
+        trainLines.remove(sentence)
+
+    combined_text = "".join(trainLines)
+
+    for i in range(len(random_sentences)):
+        random_sentences[i] = random_sentences[i].strip()
+    random_sentences = [sentence for sentence in random_sentences if len(get_token_list(sentence)) >= NGRAM_SIZE]
+    tokens = rem_low_freq(get_token_list(combined_text), 1)
 
     for n in range(NGRAM_SIZE):
         ngramDicts[n + 1] = construct_ngram(n + 1, tokens)
-    # print(tokens)
-    # print(kneser_ney_smoothing(ngramDicts, 0.75, ['between', 'him', 'and', 'rahul']))
-    # print(kneser_ney_smoothing(ngramDicts, 0.75, ['between', 'him', 'and', 'Darcy']))
-    # print(kneser_ney_smoothing(ngramDicts, 0.75, ['between', 'and', 'him', 'Darcy']))
-    # print(kneser_ney_smoothing(ngramDicts, 0.75, ['My', 'name', 'is', 'Rahul']))
-    # print(kneser_ney_smoothing(ngramDicts, 0.75, "start of the nothing".split()))
-    #
-    # print("WittenBell")
-    # # same for witten bell
-    # print(witten_bell_smoothing(ngramDicts, ['between', 'him', 'and', 'rahul']))
-    # print(witten_bell_smoothing(ngramDicts, ['between', 'him', 'and', 'Darcy']))
-    # print(witten_bell_smoothing(ngramDicts, ['between', 'and', 'him', 'Darcy']))
-    # print(witten_bell_smoothing(ngramDicts, ['My', 'name', 'is', 'Rahul']))
-    # print(witten_bell_smoothing(ngramDicts, "start of the nothing".split()))
 
-    print("Sentence: start of the nothing")
-    print(sentence_likelihood(ngramDicts, "start of the nothing", 'wb'))
-    print(sentence_likelihood(ngramDicts, "start of the nothing", 'kn'))
+    # get 1000 random sentences from the corpus using random library
 
-    print("Sentence: between him and rahul")
-    print(sentence_likelihood(ngramDicts, "between him and darcy and darcy", 'wb'))
-    print(sentence_likelihood(ngramDicts, "between him and darcy and darcy", 'kn'))
+    wb_perplexities = []
+    with alive_bar(len(random_sentences)) as bar:
+        for sentence in random_sentences:
+            wb_perplexities.append(perplexity(ngramDicts, sentence, 'wb'))
+            bar()
 
-    print("Sentence: between him and Darcy")
-    print(sentence_likelihood(ngramDicts, "between him and Darcy he was the best", 'wb'))
-    print(sentence_likelihood(ngramDicts, "between him and Darcy he was the best", 'kn'))
+    wb_avg = sum(wb_perplexities) / len(wb_perplexities)
+    print(f'Witten-Bell average perplexity: {wb_avg}')
+    # calculate perplexity for each sentence using Kneser-Ney smoothing
+    kn_perplexities = []
+    with alive_bar(len(random_sentences)) as bar:
+        for sentence in random_sentences:
+            kn_perplexities.append(perplexity(ngramDicts, sentence, 'kn'))
+            bar()
+
+    # average
+    # print(wb_perplexities)
+    # print(kn_perplexities)
+
+    kn_avg = sum(kn_perplexities) / len(kn_perplexities)
+
+    print(f'Kneser-Ney average perplexity: {kn_avg}')
