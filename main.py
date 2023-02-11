@@ -155,7 +155,7 @@ def kneser_ney_smoothing(ngram_dict: dict, d: float, ngram: list) -> float:
             if ngram[-1] in value:
                 count += 1
 
-        print(f'Count: {count}, Denom: {denom}')
+        # print(f'Count: {count}, Denom: {denom}')
         return count / denom
 
     try:
@@ -189,17 +189,26 @@ def witten_bell_smoothing(ngram_dict: dict, ngram: list) -> float:
         if ngram[i] not in ngram_dict[1]:
             ngram[i] = '<UNK>'
 
+    if len(ngram) == 1:
+        return ngram_count(ngram_dict, ngram) / len(ngram_dict[1])
     try:
         cur_dict = ngram_dict[len(ngram)]
         # len of ngram - 1
         for i in range(len(ngram) - 1):
             cur_dict = cur_dict[ngram[i]]
-        lambdaInvNum = len(cur_dict)
+        lambda_inv_num = len(cur_dict)
     except KeyError:
-        lambdaInvNum = 0
+        lambda_inv_num = 0
 
-    lambdaInvNum = lambdaInvNum / (lambdaInvNum + ngram_count(ngram_dict, ngram[:-1]))
-    lambd = 1 - lambdaInvNum
+    try:
+        lambda_inv_num = lambda_inv_num / (lambda_inv_num + ngram_count(ngram_dict, ngram[:-1]))
+    except ZeroDivisionError:
+        return 0
+    lambd = 1 - lambda_inv_num
+
+    first_term = lambd * ngram_count(ngram_dict, ngram) / ngram_count(ngram_dict, ngram[:-1])
+    second_term = lambda_inv_num * witten_bell_smoothing(ngram_dict, ngram[1:])
+    return first_term + second_term
 
 
 tokens = get_token_list("corpus/Pride and Prejudice - Jane Austen.txt")
@@ -212,3 +221,11 @@ print(kneser_ney_smoothing(ngramDicts, 0.75, ['between', 'him', 'and', 'Darcy'])
 print(kneser_ney_smoothing(ngramDicts, 0.75, ['between', 'and', 'him', 'Darcy']))
 print(kneser_ney_smoothing(ngramDicts, 0.75, ['My', 'name', 'is', 'Rahul']))
 print(kneser_ney_smoothing(ngramDicts, 0.75, "start of the nothing".split()))
+
+print("WittenBell")
+# same for witten bell
+print(witten_bell_smoothing(ngramDicts, ['between', 'him', 'and', 'rahul']))
+print(witten_bell_smoothing(ngramDicts, ['between', 'him', 'and', 'Darcy']))
+print(witten_bell_smoothing(ngramDicts, ['between', 'and', 'him', 'Darcy']))
+print(witten_bell_smoothing(ngramDicts, ['My', 'name', 'is', 'Rahul']))
+print(witten_bell_smoothing(ngramDicts, "start of the nothing".split()))
