@@ -12,7 +12,7 @@ def get_token_list(path: str) -> list:
     :param path: path to the input text file
     :return: list of tokens
     """
-    in_text = open(path, "r")
+    in_text = open(path, "r", encoding="utf-8")
     # lower case it
     in_text = in_text.read().lower()
     # tokenize hashtags
@@ -36,7 +36,35 @@ def get_token_list(path: str) -> list:
     in_text = in_text.replace('<', ' <')
     in_text = in_text.replace('>', '> ')
 
-    return in_text.split()
+    return rem_low_freq(in_text.split(), 1)
+
+
+def rem_low_freq(tokens: list, threshold: int) -> list:
+    """
+    Removes tokens from the input list that occur less than the threshold and replace them with <UNK>
+    :param tokens: list of tokens
+    :param threshold: threshold
+    :return: list of tokens with low frequency tokens removed
+    """
+    # get the frequency of each token
+    freq = {}
+    for token in tokens:
+        if token in freq:
+            freq[token] += 1
+        else:
+            freq[token] = 1
+
+    # remove tokens with frequency less than threshold
+    for token in list(freq.keys()):
+        if freq[token] <= threshold:
+            del freq[token]
+
+    # replace all tokens not in freq with <UNK>
+    for i in range(len(tokens)):
+        if tokens[i] not in freq:
+            tokens[i] = '<UNK>'
+
+    return tokens
 
 
 def construct_ngram(n: int, token_list: list) -> dict:
@@ -61,6 +89,8 @@ def construct_ngram(n: int, token_list: list) -> dict:
                 if j == n - 1:
                     cur_dict[ngram_to_check[j]] += 1
             cur_dict = cur_dict[ngram_to_check[j]]
+
+    # remove all entities in dictionary tree with count 1 and add <UNK> instead
 
     return ngram_dict
 
@@ -88,6 +118,11 @@ def ngram_count(ngram_dict: dict, ngram: list) -> int:
     :return: count of the n-gram
     """
     cur_dict = ngram_dict[len(ngram)]
+    if n == 1:
+        if ngram[0] in cur_dict:
+            return cur_dict[ngram[0]]
+        else:
+            return cur_dict['<UNK>']
     for i in range(len(ngram)):
         if ngram[i] in cur_dict:
             cur_dict = cur_dict[ngram[i]]
@@ -104,6 +139,13 @@ def kneser_ney_smoothing(ngram_dict: dict, d: float, ngram: list) -> float:
     :param ngram: n-gram to be smoothed
     :return: smoothed probability
     """
+    # replace unknown in ngram with <UNK>
+    for i in range(len(ngram)):
+        ngram[i] = ngram[i].lower()
+        if ngram[i] not in ngram_dict[1]:
+            ngram[i] = '<UNK>'
+
+    # print(f'Final ngram: {ngram}')
     if len(ngram) == 1:
         denom = dfs_count(ngram_dict[2])
         # count all bigrams ending with ngram[-1]
@@ -131,10 +173,13 @@ def kneser_ney_smoothing(ngram_dict: dict, d: float, ngram: list) -> float:
     return first + second * kneser_ney_smoothing(ngram_dict, d, ngram[1:])
 
 
-tokens = get_token_list("corpus/Pride and Prejudice - Jane Austen.txt")
-
+# tokens = get_token_list("corpus/Pride and Prejudice - Jane Austen.txt")
+tokens = get_token_list('corpus/Ulysses - James Joyce.txt')
 for n in range(NGRAM_SIZE):
     ngramDicts[n + 1] = construct_ngram(n + 1, tokens)
-
-print(kneser_ney_smoothing(ngramDicts, 0.75, ['between', 'him', 'and', 'sensibility']))
-print(kneser_ney_smoothing(ngramDicts, 0.75, ['between', 'and', 'him', 'darcy']))
+# print(tokens)
+print(kneser_ney_smoothing(ngramDicts, 0.75, ['between', 'him', 'and', 'rahul']))
+print(kneser_ney_smoothing(ngramDicts, 0.75, ['between', 'him', 'and', 'Darcy']))
+print(kneser_ney_smoothing(ngramDicts, 0.75, ['between', 'and', 'him', 'Darcy']))
+print(kneser_ney_smoothing(ngramDicts, 0.75, ['My', 'name', 'is', 'Rahul']))
+print(kneser_ney_smoothing(ngramDicts, 0.75, "start of the nothing".split()))
