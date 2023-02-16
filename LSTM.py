@@ -32,6 +32,10 @@ class Data(torch.utils.data.Dataset):
                 self.mxSentSize = len(sentence)
 
         self.vocab = list(self.vocab)
+        # add padding token
+        self.vocab.append("<PAD>")
+        # add Unknown
+        self.vocab.append("<UNK>")
         self.w2idx = {w: i for i, w in enumerate(self.vocab)}
         self.idx2w = {i: w for i, w in enumerate(self.vocab)}
 

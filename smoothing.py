@@ -60,8 +60,20 @@ def sentence_tokenizer(fullText: str) -> list:
     fullText = re.sub(r"www\S+", r"<URL> ", fullText)
 
     sentenceEnders = ['.', '!', '?']
-    # print(fullText)
-    # split on sentence enders
+
+    # split on sentence enders handling cases such as Mr. etc
+
+    fullText = fullText.replace('mr.', 'mr')
+    fullText = fullText.replace('mrs.', 'mrs')
+    fullText = fullText.replace('dr.', 'dr')
+    fullText = fullText.replace('st.', 'st')
+    fullText = fullText.replace('co.', 'co')
+    fullText = fullText.replace('inc.', 'inc')
+    fullText = fullText.replace('e.g.', 'eg')
+    fullText = fullText.replace('i.e.', 'ie')
+    fullText = fullText.replace('etc.', 'etc')
+    fullText = fullText.replace('vs.', 'vs')
+
     sentences = re.split(r' *[\.\?!][\'"\)\]]* *', fullText)
 
     sentences = [s.replace('\n', ' ') for s in sentences]
