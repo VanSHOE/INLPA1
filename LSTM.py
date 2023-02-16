@@ -1,24 +1,26 @@
 import torch
 import torch.nn as nn
-import nltk  # for tokenizing sentences
-from smoothing import get_token_list
+# import nltk  # for tokenizing sentences
+from smoothing import get_token_list, sentence_tokenizer
 import matplotlib.pyplot as plt
 
-nltk.download('punkt')
+# nltk.download('punkt')
 
 sentenceLens = {}
 
 
 class Data(torch.utils.data.Dataset):
     def __init__(self, entireText: str):
-        self.sentences = nltk.sent_tokenize(entireText)
-        self.sentences = [sentence.lower() for sentence in self.sentences if 100 > len(sentence) > 0]
-        self.token_list = [get_token_list(sentence) for sentence in self.sentences]
+        # self.sentences = nltk.sent_tokenize(entireText)
+        self.sentences = sentence_tokenizer(entireText)
+        # print(self.sentences)
+        self.sentences = [sentence for sentence in self.sentences if 30 > len(sentence) > 0]
+        print(self.sentences)
         print(len(self.sentences))
         self.vocab = set()
         self.mxSentSize = 0
 
-        for sentence in self.token_list:
+        for sentence in self.sentences:
             if len(sentence) not in sentenceLens:
                 sentenceLens[len(sentence)] = 1
             else:
@@ -30,6 +32,8 @@ class Data(torch.utils.data.Dataset):
                 self.mxSentSize = len(sentence)
 
         self.vocab = list(self.vocab)
+        self.w2idx = {w: i for i, w in enumerate(self.vocab)}
+        self.idx2w = {i: w for i, w in enumerate(self.vocab)}
 
 
 class LSTM(nn.Module):
@@ -66,7 +70,7 @@ class LSTM(nn.Module):
 
 
 data = Data(open("./corpus/Pride and Prejudice - Jane Austen.txt", "r").read())
-print(data.mxSentSize)
+# print(data.mxSentSize)
 
 plt.bar(sentenceLens.keys(), sentenceLens.values())
 plt.show()

@@ -42,6 +42,35 @@ def get_token_list(in_text: str) -> list:
     return in_text.split()
 
 
+def sentence_tokenizer(fullText: str) -> list:
+    """
+    Tokenizes the input text file into sentences
+    :param fullText: input text
+    :return: list of sentences
+    """
+    # lower case it
+    fullText = fullText.lower()
+    # tokenize hashtags
+    fullText = re.sub(r"#(\w+)", r"<HASHTAG> ", fullText)
+    # tokenize mentions
+    fullText = re.sub(r"@(\w+)", r"<MENTION> ", fullText)
+    # tokenize urls
+    fullText = re.sub(r"http\S+", r"<URL> ", fullText)
+    # starting with www
+    fullText = re.sub(r"www\S+", r"<URL> ", fullText)
+
+    sentenceEnders = ['.', '!', '?']
+    # print(fullText)
+    # split on sentence enders
+    sentences = re.split(r' *[\.\?!][\'"\)\]]* *', fullText)
+
+    sentences = [s.replace('\n', ' ') for s in sentences]
+    sentences = [s.strip() for s in sentences]
+    sentences = [s for s in sentences if s != '']
+    sentences = [get_token_list(s) for s in sentences]
+    return sentences
+
+
 def rem_low_freq(tokens: list, threshold: int) -> list:
     """
     Removes tokens from the input list that occur less than the threshold and replace them with <UNK>
