@@ -73,6 +73,7 @@ def sentence_tokenizer(fullText: str) -> list:
     fullText = fullText.replace('i.e.', 'ie')
     fullText = fullText.replace('etc.', 'etc')
     fullText = fullText.replace('vs.', 'vs')
+    fullText = fullText.replace('u.s.', 'us')
 
     sentences = re.split(r' *[\.\?!][\'"\)\]]* *', fullText)
 
