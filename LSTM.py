@@ -66,11 +66,13 @@ class Data(torch.utils.data.Dataset):
                 self.mxSentSize = len(sentence)
 
         self.vocab = list(self.vocab)
-        self.vocabSet = set(self.vocab)
+
         # add padding token
         self.vocab.append("<pad>")
         # add Unknown
         self.vocab.append("<unk>")
+
+        self.vocabSet = set(self.vocab)
         self.w2idx = {w: i for i, w in enumerate(self.vocab)}
         self.idx2w = {i: w for i, w in enumerate(self.vocab)}
 
@@ -174,7 +176,7 @@ def perplexity(data, model, sentence):
 
 
 if __name__ == '__main__':
-    data = Data(open("./corpus/Pride and Prejudice - Jane Austen.txt", "r", encoding='utf-8').read())
+    data = Data(open("./corpus/Ulysses - James Joyce.txt", "r", encoding='utf-8').read())
     model = LSTM(500, 500, 1, len(data.vocab), len(data.vocab))
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     criterion = nn.CrossEntropyLoss()
