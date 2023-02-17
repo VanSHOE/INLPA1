@@ -19,13 +19,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 class Data(torch.utils.data.Dataset):
     def __init__(self, entireText: str):
-        # self.sentences = nltk.sent_tokenize(entireText)
         self.sentences = sentence_tokenizer(entireText)
-        # print(self.sentences)
-        # plot bar graph of lengths of sentences
-        # plt.hist([len(sentence) for sentence in self.sentences], bins=50)
-        # plt.show()
-        #
         self.device = device
         self.Ssentences = [sentence for sentence in self.sentences if 40 > len(sentence) > 0]
         self.Lsentences = [sentence for sentence in self.sentences if len(sentence) >= 40]
@@ -36,19 +30,9 @@ class Data(torch.utils.data.Dataset):
             self.sentences.append(sentence[:half])
             self.sentences.append(sentence[half:])
         self.sentences += self.Ssentences
-        # print total sentences and those with len > 40
-        # print("Total sentences:", len(self.sentences))
-        # print("Sentences with len > 40:", len(self.Lsentences))
-        # print("Sentences with len < 40:", len(self.Ssentences))
 
         self.sentences = [sentence for sentence in self.sentences if len(sentence) <= 40]
 
-        # exit(33)
-        # plt.hist([len(sentence) for sentence in self.sentences], bins=50)
-        # plt.show()
-        # exit(33)
-        # sort by length
-        # self.sentences.sort(key=lambda x: len(x))
         print(self.sentences)
         print(len(self.sentences))
         self.vocab = set()
@@ -119,14 +103,16 @@ class LSTM(nn.Module):
         return self.decoder(out)
 
 
-def train(model, data, optimizer, criterion):
+def train(model, data, optimizer, criterion, valDat):
     epoch_loss = 0
     model.train()
 
     dataL = DataLoader(data, batch_size=32, shuffle=True)
     lossDec = True
     prevLoss = 10000000
+    prevValLoss = 10000000
     epoch = 0
+    es_patience = 2
     while lossDec:
         epoch_loss = 0
         for i, (x, y) in enumerate(dataL):
@@ -150,6 +136,18 @@ def train(model, data, optimizer, criterion):
             if i % 100 == 0:
                 print(f"Epoch {epoch + 1} Batch {i} loss: {loss.item()}")
 
+        validationLoss = getLossDataset(valDat, model)
+        print(f"Validation loss: {validationLoss}")
+        if validationLoss > prevValLoss:
+            print("Validation loss increased")
+            if es_patience > 0:
+                es_patience -= 1
+
+            else:  # early stopping
+                print("Early stopping")
+                lossDec = False
+        prevValLoss = validationLoss
+        model.train()
         if epoch_loss / len(dataL) > prevLoss:
             lossDec = False
         prevLoss = epoch_loss / len(dataL)
@@ -175,13 +173,7 @@ def perplexity(data, model, sentence):
     return np.exp(perp / len(target.cpu().numpy()))
 
 
-if __name__ == '__main__':
-    data = Data(open("./corpus/Ulysses - James Joyce.txt", "r", encoding='utf-8').read())
-    model = LSTM(500, 500, 1, len(data.vocab), len(data.vocab))
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    criterion = nn.CrossEntropyLoss()
-    train(model, data, optimizer, criterion)
-
+def getPerpDataset(data: Data):
     model.eval()
 
     # check perplexity for each sentence in data
@@ -197,13 +189,56 @@ if __name__ == '__main__':
                 perps[newPerp] = 1
             bar()
 
-    print(perps)
+    # print(perps)
     # histogram binned
     plt.hist(perps.keys(), bins=100)
     plt.show()
-    print(perp / len(data.sentences))
-    # print median taking into acount the freq
+    print(f"Mean: {perp / len(data.sentences)}")
+    # print median taking into account the freq
     perpList = []
     for perp in perps:
         perpList += [perp] * perps[perp]
-    print(np.median(perpList))
+    print(f"Median: {np.median(perpList)}")
+
+
+def getLossDataset(data: Data, model):
+    model.eval()
+
+    dataL = DataLoader(data, batch_size=32, shuffle=True)
+    criterion = nn.CrossEntropyLoss()
+    loss = 0
+
+    for i, (x, y) in enumerate(dataL):
+        x = x.to(model.device)
+        y = y.to(model.device)
+
+        output = model(x)
+
+        y = y.view(-1)
+        output = output.view(-1, output.shape[-1])
+
+        loss += criterion(output, y).item()
+
+    return loss / len(dataL)
+
+
+if __name__ == '__main__':
+    fullText = open("./corpus/Pride and Prejudice - Jane Austen.txt", "r", encoding='utf-8').read()
+    # split train test validation
+    trainText = fullText[:int(len(fullText) * 0.8)]
+    testText = fullText[int(len(fullText) * 0.8):int(len(fullText) * 0.9)]
+    valText = fullText[int(len(fullText) * 0.9):]
+
+    train_data = Data(trainText)
+    test_data = Data(testText)
+    val_data = Data(valText)
+    # split data
+
+    model = LSTM(500, 500, 1, len(train_data.vocab), len(train_data.vocab))
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    criterion = nn.CrossEntropyLoss()
+    train(model, train_data, optimizer, criterion, val_data)
+
+    getPerpDataset(train_data)
+    getPerpDataset(val_data)
+    getPerpDataset(test_data)
