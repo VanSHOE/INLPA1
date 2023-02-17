@@ -2,10 +2,12 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 # import nltk  # for tokenizing sentences
-from smoothing import get_token_list, sentence_tokenizer
+from smoothing import get_token_list, sentence_tokenizer, rem_low_freq
 import matplotlib.pyplot as plt
 from alive_progress import alive_bar
 import numpy as np
+import random
+import time
 
 # nltk.download('punkt')
 
@@ -18,8 +20,8 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 class Data(torch.utils.data.Dataset):
-    def __init__(self, entireText: str):
-        self.sentences = sentence_tokenizer(entireText)
+    def __init__(self, sentences):
+        self.sentences = sentences
         self.device = device
         self.Ssentences = [sentence for sentence in self.sentences if 40 > len(sentence) > 0]
         self.Lsentences = [sentence for sentence in self.sentences if len(sentence) >= 40]
@@ -33,7 +35,7 @@ class Data(torch.utils.data.Dataset):
 
         self.sentences = [sentence for sentence in self.sentences if len(sentence) <= 40]
 
-        print(self.sentences)
+        # print(self.sentences)
         print(len(self.sentences))
         self.vocab = set()
         self.mxSentSize = 0
@@ -54,7 +56,8 @@ class Data(torch.utils.data.Dataset):
         # add padding token
         self.vocab.append("<pad>")
         # add Unknown
-        self.vocab.append("<unk>")
+        if "<unk>" not in self.vocab:
+            self.vocab.append("<unk>")
 
         self.vocabSet = set(self.vocab)
         self.w2idx = {w: i for i, w in enumerate(self.vocab)}
@@ -62,6 +65,7 @@ class Data(torch.utils.data.Dataset):
 
         # pad each sentence to 40
         for i in range(len(self.sentences)):
+            # print(type(self.sentences[i]))
             self.sentences[i] = ["<pad>"] * (self.mxSentSize - len(self.sentences[i])) + self.sentences[i]
 
         self.sentencesIdx = torch.tensor([[self.w2idx[token] for token in sentence] for sentence in self.sentences],
@@ -103,7 +107,7 @@ class LSTM(nn.Module):
         return self.decoder(out)
 
 
-def train(model, data, optimizer, criterion, valDat):
+def train(model, data, optimizer, criterion, valDat, maxPat=5):
     epoch_loss = 0
     model.train()
 
@@ -112,7 +116,7 @@ def train(model, data, optimizer, criterion, valDat):
     prevLoss = 10000000
     prevValLoss = 10000000
     epoch = 0
-    es_patience = 2
+    es_patience = maxPat
     while lossDec:
         epoch_loss = 0
         for i, (x, y) in enumerate(dataL):
@@ -145,7 +149,11 @@ def train(model, data, optimizer, criterion, valDat):
 
             else:  # early stopping
                 print("Early stopping")
+                model.load_state_dict(torch.load("model.pt"))
                 lossDec = False
+        else:
+            torch.save(model.state_dict(), "model.pt")
+            es_patience = maxPat
         prevValLoss = validationLoss
         model.train()
         if epoch_loss / len(dataL) > prevLoss:
@@ -223,21 +231,35 @@ def getLossDataset(data: Data, model):
 
 
 if __name__ == '__main__':
-    fullText = open("./corpus/Pride and Prejudice - Jane Austen.txt", "r", encoding='utf-8').read()
-    # split train test validation
-    trainText = fullText[:int(len(fullText) * 0.8)]
-    testText = fullText[int(len(fullText) * 0.8):int(len(fullText) * 0.9)]
-    valText = fullText[int(len(fullText) * 0.9):]
+    # seed random with time
+    random.seed(time.time())
+
+    fullText = open("./corpus/Pride and Prejudice - Jane Austen.txt", "r", encoding='utf-8').read().lower()
+    sentences = sentence_tokenizer(fullText, 2)
+
+    sentences = [sentence for sentence in sentences if len(sentence) > 0]
+    # split train test validation using random
+    trainText = []
+    testText = []
+    valText = []
+    for sentence in sentences:
+        rand = random.random()
+        if rand < 0.6:
+            trainText.append(sentence)
+        elif rand < 0.8:
+            testText.append(sentence)
+        else:
+            valText.append(sentence)
 
     train_data = Data(trainText)
     test_data = Data(testText)
     val_data = Data(valText)
     # split data
 
-    model = LSTM(500, 500, 1, len(train_data.vocab), len(train_data.vocab))
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    model = LSTM(250, 250, 1, len(train_data.vocab), len(train_data.vocab))
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
     criterion = nn.CrossEntropyLoss()
-    train(model, train_data, optimizer, criterion, val_data)
+    train(model, train_data, optimizer, criterion, val_data, 3)
 
     getPerpDataset(train_data)
     getPerpDataset(val_data)

@@ -42,7 +42,7 @@ def get_token_list(in_text: str) -> list:
     return in_text.split()
 
 
-def sentence_tokenizer(fullText: str) -> list:
+def sentence_tokenizer(fullText: str, thresh: int) -> list:
     """
     Tokenizes the input text file into sentences
     :param fullText: input text
@@ -85,6 +85,20 @@ def sentence_tokenizer(fullText: str) -> list:
     sentences = [s.strip() for s in sentences]
     sentences = [s for s in sentences if s != '']
     sentences = [get_token_list(s) for s in sentences]
+
+    tokenDict = {}
+    for sentence in sentences:
+        for token in sentence:
+            if token in tokenDict:
+                tokenDict[token] += 1
+            else:
+                tokenDict[token] = 1
+
+    for sentence in sentences:
+        for i in range(len(sentence)):
+            if tokenDict[sentence[i]] <= thresh:
+                sentence[i] = '<unk>'
+
     return sentences
 
 
