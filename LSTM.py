@@ -12,6 +12,9 @@ sentenceLens = {}
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
+# device = "cpu"
+
+
 class Data(torch.utils.data.Dataset):
     def __init__(self, entireText: str):
         # self.sentences = nltk.sent_tokenize(entireText)
@@ -116,23 +119,22 @@ def train(model, data, optimizer, criterion):
     epoch_loss = 0
     model.train()
 
-    dataL = DataLoader(data, batch_size=32)
+    dataL = DataLoader(data, batch_size=32, shuffle=True)
 
-    for epoch in range(2):
+    for epoch in range(1):
+        epoch_loss = 0
         for i, (x, y) in enumerate(dataL):
+
             optimizer.zero_grad()
             x = x.to(model.device)
-            # int64 y
+
             y = y.to(model.device)
-            # change y to int64
+
             output = model(x)
-            # print(y.shape, output.shape)
-            # print(f"Vocab size: {len(data.vocab)}")
-            # exit(33)
-            # flatten y
+
             y = y.view(-1)
             output = output.view(-1, output.shape[-1])
-            print(y.shape, output.shape)
+
             loss = criterion(output, y)
             loss.backward()
             optimizer.step()
@@ -145,9 +147,33 @@ def train(model, data, optimizer, criterion):
         print(f"Epoch {epoch + 1} loss: {epoch_loss / len(dataL)}")
 
 
+def perplexity(data, model, sentence):
+    sentence = get_token_list(sentence)
+    sentence = torch.tensor([data.w2idx[token] for token in sentence], device=model.device)
+    y = model(sentence[:-1])
+    probs = torch.nn.functional.softmax(y, dim=-1)
+    target = sentence[1:]
+    word_probs = torch.gather(probs, 1, target.view(-1, 1)).squeeze()
+    perplexity = torch.exp(-torch.log(word_probs).sum() / len(sentence))
+    return perplexity.item()
+
+
 if __name__ == '__main__':
-    data = Data(open("./corpus/Pride and Prejudice - Jane Austen.txt", "r").read())
-    model = LSTM(150, 200, 1, len(data.vocab), len(data.vocab))
+    data = Data(open("./corpus/Ulysses - James Joyce.txt", "r", encoding='utf-8').read())
+    model = LSTM(500, 500, 1, len(data.vocab), len(data.vocab))
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     criterion = nn.CrossEntropyLoss()
     train(model, data, optimizer, criterion)
+
+    model.eval()
+    context = get_token_list("Mr Dedalus said")
+    textCopy = context.copy()
+    context = torch.tensor([data.w2idx[token] for token in context], device=model.device)
+    # perplexity(data, model, context)
+    # exit(55)
+    y = model(context)
+    # print word with max prob
+    print(y.shape)
+    print(y[-1].shape)
+
+    print(perplexity(data, model, "Mr Dedalus said"))
