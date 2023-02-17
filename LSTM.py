@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 
 sentenceLens = {}
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
 
 class Data(torch.utils.data.Dataset):
     def __init__(self, entireText: str):
@@ -19,7 +21,7 @@ class Data(torch.utils.data.Dataset):
         # plt.hist([len(sentence) for sentence in self.sentences], bins=50)
         # plt.show()
         #
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = device
         self.Ssentences = [sentence for sentence in self.sentences if 40 > len(sentence) > 0]
         self.Lsentences = [sentence for sentence in self.sentences if len(sentence) >= 40]
         # split long sentences into 2
@@ -32,6 +34,10 @@ class Data(torch.utils.data.Dataset):
         # print total sentences and those with len > 40
         # print("Total sentences:", len(self.sentences))
         # print("Sentences with len > 40:", len(self.Lsentences))
+        # print("Sentences with len < 40:", len(self.Ssentences))
+
+        self.sentences = [sentence for sentence in self.sentences if len(sentence) <= 40]
+
         # exit(33)
         # plt.hist([len(sentence) for sentence in self.sentences], bins=50)
         # plt.show()
@@ -65,7 +71,7 @@ class Data(torch.utils.data.Dataset):
 
         # pad each sentence to 40
         for i in range(len(self.sentences)):
-            self.sentences[i] = self.sentences[i] + ["<PAD>"] * (self.mxSentSize - len(self.sentences[i]))
+            self.sentences[i] = ["<PAD>"] * (self.mxSentSize - len(self.sentences[i])) + self.sentences[i]
 
         self.sentencesIdx = torch.tensor([[self.w2idx[token] for token in sentence] for sentence in self.sentences],
                                          device=self.device)
@@ -74,18 +80,18 @@ class Data(torch.utils.data.Dataset):
         return len(self.sentencesIdx)
 
     def __getitem__(self, idx):
+        # sentence, last word
         return self.sentencesIdx[idx][:-1], self.sentencesIdx[idx][1:]
 
 
 class LSTM(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, num_classes, vocab_size):
         super(LSTM, self).__init__()  # call the init function of the parent class
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"  # check if GPU is available
+        self.device = device
         self.num_layers = num_layers  # number of LSTM layers
         self.hidden_size = hidden_size  # size of LSTM hidden state
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)  # LSTM layer
-        self.decoder = nn.Linear(hidden_size, num_classes,
-                                 device=self.device)  # linear layer to map hidden state to output classes
+        self.decoder = nn.Linear(hidden_size, vocab_size)  # linear layer to map the hidden state to output classes
 
         self.elayer = nn.Embedding(vocab_size, input_size)
 
@@ -100,10 +106,10 @@ class LSTM(nn.Module):
 
         # Pass the extracted output through the linear layer to map it to output classes
         # decode for all time steps
-        for i in range(out.size(1)):
-            out[:, i, :] = self.decoder(out[:, i, :])
+        # for i in range(out.size(1)):
+        #     out[:, i, :] = self.decoder(out[:, i, :])
 
-        return out
+        return self.decoder(out)
 
 
 def train(model, data, optimizer, criterion):
@@ -116,12 +122,25 @@ def train(model, data, optimizer, criterion):
         for i, (x, y) in enumerate(dataL):
             optimizer.zero_grad()
             x = x.to(model.device)
+            # int64 y
             y = y.to(model.device)
+            # change y to int64
             output = model(x)
-            loss = criterion(y, output)
+            # print(y.shape, output.shape)
+            # print(f"Vocab size: {len(data.vocab)}")
+            # exit(33)
+            # flatten y
+            y = y.view(-1)
+            output = output.view(-1, output.shape[-1])
+            print(y.shape, output.shape)
+            loss = criterion(output, y)
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
+
+            # print loss every 100 batches
+            if i % 100 == 0:
+                print(f"Epoch {epoch + 1} Batch {i} loss: {loss.item()}")
 
         print(f"Epoch {epoch + 1} loss: {epoch_loss / len(dataL)}")
 
