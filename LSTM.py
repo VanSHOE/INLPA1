@@ -4,6 +4,8 @@ from torch.utils.data import DataLoader
 # import nltk  # for tokenizing sentences
 from smoothing import get_token_list, sentence_tokenizer
 import matplotlib.pyplot as plt
+from alive_progress import alive_bar
+import numpy as np
 
 # nltk.download('punkt')
 
@@ -66,15 +68,15 @@ class Data(torch.utils.data.Dataset):
         self.vocab = list(self.vocab)
         self.vocabSet = set(self.vocab)
         # add padding token
-        self.vocab.append("<PAD>")
+        self.vocab.append("<pad>")
         # add Unknown
-        self.vocab.append("<UNK>")
+        self.vocab.append("<unk>")
         self.w2idx = {w: i for i, w in enumerate(self.vocab)}
         self.idx2w = {i: w for i, w in enumerate(self.vocab)}
 
         # pad each sentence to 40
         for i in range(len(self.sentences)):
-            self.sentences[i] = ["<PAD>"] * (self.mxSentSize - len(self.sentences[i])) + self.sentences[i]
+            self.sentences[i] = ["<pad>"] * (self.mxSentSize - len(self.sentences[i])) + self.sentences[i]
 
         self.sentencesIdx = torch.tensor([[self.w2idx[token] for token in sentence] for sentence in self.sentences],
                                          device=self.device)
@@ -120,8 +122,10 @@ def train(model, data, optimizer, criterion):
     model.train()
 
     dataL = DataLoader(data, batch_size=32, shuffle=True)
-
-    for epoch in range(1):
+    lossDec = True
+    prevLoss = 10000000
+    epoch = 0
+    while lossDec:
         epoch_loss = 0
         for i, (x, y) in enumerate(dataL):
 
@@ -144,36 +148,60 @@ def train(model, data, optimizer, criterion):
             if i % 100 == 0:
                 print(f"Epoch {epoch + 1} Batch {i} loss: {loss.item()}")
 
+        if epoch_loss / len(dataL) > prevLoss:
+            lossDec = False
+        prevLoss = epoch_loss / len(dataL)
+
         print(f"Epoch {epoch + 1} loss: {epoch_loss / len(dataL)}")
+        epoch += 1
 
 
 def perplexity(data, model, sentence):
     sentence = get_token_list(sentence)
+    for tokenIdx in range(len(sentence)):
+        if sentence[tokenIdx] not in data.vocabSet:
+            sentence[tokenIdx] = "<unk>"
+
     sentence = torch.tensor([data.w2idx[token] for token in sentence], device=model.device)
     y = model(sentence[:-1])
-    probs = torch.nn.functional.softmax(y, dim=-1)
+    # print(y.shape)
+    probs = torch.nn.functional.softmax(y, dim=-1).cpu().detach().numpy()
     target = sentence[1:]
-    word_probs = torch.gather(probs, 1, target.view(-1, 1)).squeeze()
-    perplexity = torch.exp(-torch.log(word_probs).sum() / len(sentence))
-    return perplexity.item()
+    perp = 0
+    for i in range(len(target)):
+        perp += -np.log(probs[i][target[i]])
+    return np.exp(perp / len(target.cpu().numpy()))
 
 
 if __name__ == '__main__':
-    data = Data(open("./corpus/Ulysses - James Joyce.txt", "r", encoding='utf-8').read())
+    data = Data(open("./corpus/Pride and Prejudice - Jane Austen.txt", "r", encoding='utf-8').read())
     model = LSTM(500, 500, 1, len(data.vocab), len(data.vocab))
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     criterion = nn.CrossEntropyLoss()
     train(model, data, optimizer, criterion)
 
     model.eval()
-    context = get_token_list("Mr Dedalus said")
-    textCopy = context.copy()
-    context = torch.tensor([data.w2idx[token] for token in context], device=model.device)
-    # perplexity(data, model, context)
-    # exit(55)
-    y = model(context)
-    # print word with max prob
-    print(y.shape)
-    print(y[-1].shape)
 
-    print(perplexity(data, model, "Mr Dedalus said"))
+    # check perplexity for each sentence in data
+    perp = 0
+    perps = {}
+    with alive_bar(len(data.sentences)) as bar:
+        for sentence in data.sentences:
+            newPerp = perplexity(data, model, ' '.join(sentence))
+            perp += newPerp
+            if newPerp in perps:
+                perps[newPerp] += 1
+            else:
+                perps[newPerp] = 1
+            bar()
+
+    print(perps)
+    # histogram binned
+    plt.hist(perps.keys(), bins=100)
+    plt.show()
+    print(perp / len(data.sentences))
+    # print median taking into acount the freq
+    perpList = []
+    for perp in perps:
+        perpList += [perp] * perps[perp]
+    print(np.median(perpList))

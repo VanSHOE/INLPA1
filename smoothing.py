@@ -75,6 +75,10 @@ def sentence_tokenizer(fullText: str) -> list:
     fullText = fullText.replace('vs.', 'vs')
     fullText = fullText.replace('u.s.', 'us')
 
+    # fullText = rem_low_freq(fullText.split(), 1)
+    # # join list with space
+    # fullText = ' '.join(fullText)
+
     sentences = re.split(r' *[\.\?!][\'"\)\]]* *', fullText)
 
     sentences = [s.replace('\n', ' ') for s in sentences]
@@ -86,7 +90,7 @@ def sentence_tokenizer(fullText: str) -> list:
 
 def rem_low_freq(tokens: list, threshold: int) -> list:
     """
-    Removes tokens from the input list that occur less than the threshold and replace them with <UNK>
+    Removes tokens from the input list that occur less than the threshold and replace them with <unk>
     :param tokens: list of tokens
     :param threshold: threshold
     :return: list of tokens with low frequency tokens removed
@@ -104,10 +108,10 @@ def rem_low_freq(tokens: list, threshold: int) -> list:
         if freq[token] <= threshold:
             del freq[token]
 
-    # replace all tokens not in freq with <UNK>
+    # replace all tokens not in freq with <unk>
     for i in range(len(tokens)):
         if tokens[i] not in freq:
-            tokens[i] = '<UNK>'
+            tokens[i] = '<unk>'
 
     return tokens
 
@@ -135,7 +139,7 @@ def construct_ngram(n: int, token_list: list) -> dict:
                     cur_dict[ngram_to_check[j]] += 1
             cur_dict = cur_dict[ngram_to_check[j]]
 
-    # remove all entities in dictionary tree with count 1 and add <UNK> instead
+    # remove all entities in dictionary tree with count 1 and add <unk> instead
 
     return ngram_dict
 
@@ -167,7 +171,7 @@ def ngram_count(ngram_dict: dict, ngram: list) -> int:
         if ngram[0] in cur_dict:
             return cur_dict[ngram[0]]
         else:
-            return cur_dict['<UNK>']
+            return cur_dict['<unk>']
     for i in range(len(ngram)):
         if ngram[i] in cur_dict:
             cur_dict = cur_dict[ngram[i]]
@@ -184,11 +188,11 @@ def kneser_ney_smoothing(ngram_dict: dict, d: float, ngram: list) -> float:
     :param ngram: n-gram to be smoothed
     :return: smoothed probability
     """
-    # replace unknown in ngram with <UNK>
+    # replace unknown in ngram with <unk>
     for i in range(len(ngram)):
         ngram[i] = ngram[i].lower()
         if ngram[i] not in ngram_dict[1]:
-            ngram[i] = '<UNK>'
+            ngram[i] = '<unk>'
 
     # print(f'Final ngram: {ngram}')
     if len(ngram) == 1:
@@ -228,11 +232,11 @@ def witten_bell_smoothing(ngram_dict: dict, ngram: list) -> float:
     :param ngram: n-gram to be smoothed
     :return: smoothed probability
     """
-    # replace unknown in ngram with <UNK>
+    # replace unknown in ngram with <unk>
     for i in range(len(ngram)):
         ngram[i] = ngram[i].lower()
         if ngram[i] not in ngram_dict[1]:
-            ngram[i] = '<UNK>'
+            ngram[i] = '<unk>'
 
     if len(ngram) == 1:
         return ngram_count(ngram_dict, ngram) / len(ngram_dict[1])
