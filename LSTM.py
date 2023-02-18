@@ -9,6 +9,8 @@ import numpy as np
 import random
 import time
 
+MODEL = "LM6"
+
 # nltk.download('punkt')
 
 sentenceLens = {}
@@ -119,7 +121,6 @@ class LSTM(nn.Module):
 
         # Forward propagate through the LSTM layer
         out, _ = self.lstm(embeddings)  # out: tensor of shape (batch_size, seq_length, hidden_size)
-        out = nn.functional.dropout(out, p=0.1, training=self.training)
         return self.decoder(out)
 
 
@@ -158,17 +159,17 @@ def train(model, data, optimizer, criterion, valDat, maxPat=5):
 
         validationLoss = getLossDataset(valDat, model)
         print(f"Validation loss: {validationLoss}")
-        if validationLoss > prevValLoss:
+        if validationLoss - epoch_loss / len(dataL) > 2:
             print("Validation loss increased")
             if es_patience > 0:
                 es_patience -= 1
 
             else:  # early stopping
                 print("Early stopping")
-                # model.load_state_dict(torch.load("model.pt"))
+                model.load_state_dict(torch.load(f"{MODEL}.pt"))
                 lossDec = False
         else:
-            torch.save(model.state_dict(), "model.pt")
+            torch.save(model.state_dict(), f"{MODEL}.pt")
             es_patience = maxPat
         prevValLoss = validationLoss
         model.train()
@@ -316,6 +317,6 @@ if __name__ == '__main__':
     train(model, train_data, optimizer, criterion, val_data, 4)
 
     getPerpDataset(val_data, "val.log")
-    getPerpDataset(test_data, "2020115006_LM6_test.txt")
+    getPerpDataset(test_data, f"2020115006_{MODEL}_test-perplexity.txt")
 
-    getPerpDataset(train_data, "2020115006_LM6_train.txt")
+    getPerpDataset(train_data, f"2020115006_{MODEL}_train-perplexity.txt")
