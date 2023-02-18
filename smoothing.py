@@ -29,8 +29,9 @@ def get_token_list(in_text: str) -> list:
     # starting with www
     in_text = re.sub(r"www\S+", r"<URL> ", in_text)
 
-    special_chars = [' ', '*', '!', '?', '.', ',', ';', ':', '(', ')', '[', ']', '{', '}', '/', '\\', '|', '-', '_',
-                     '=', '+', '`', '~', '@', '#', '$', '%', '^', '&', '0', '1', '2', '3', '4', '5', '6', '7', '8',
+    special_chars = [' ', '*', '!', '?', '.', ',', ';', ':', '(', ')', '[', ']', '{', '}', '/', '\\', '|', '-', '_', '—'
+                                                                                                                     '=',
+                     '+', '`', '~', '@', '#', '$', '%', '^', '&', '0', '1', '2', '3', '4', '5', '6', '7', '8',
                      '9']
 
     # pad the special characters with spaces
@@ -196,6 +197,9 @@ def ngram_count(ngram_dict: dict, ngram: list) -> int:
     return cur_dict
 
 
+dfs_countD = {}
+
+
 def kneser_ney_smoothing(ngram_dict: dict, d: float, ngram: list) -> float:
     """
     Performs Kneser-Ney smoothing on the input n-gram dictionary
@@ -212,7 +216,11 @@ def kneser_ney_smoothing(ngram_dict: dict, d: float, ngram: list) -> float:
 
     # print(f'Final ngram: {ngram}')
     if len(ngram) == 1:
-        denom = dfs_count(ngram_dict[2])
+        if 2 not in dfs_countD:
+            denom = dfs_count(ngram_dict[2])
+            dfs_countD[2] = denom
+        else:
+            denom = dfs_countD[2]
         # count all bigrams ending with ngram[-1]
         count = 0
 
@@ -352,56 +360,79 @@ if __name__ == '__main__':
 
     # get 1000 random sentences from the corpus using random library
 
-    outputfile = open("2020115006_LM2_test-perplexity.txt", "w", encoding="utf-8")
     wb_perplexities = []
+    toWrite = []
     with alive_bar(len(random_sentences)) as bar:
         for sentence in random_sentences:
             wb_perplexities.append(perplexity(ngramDicts, sentence, 'wb'))
             # sentence<space>perplexity
-            outputfile.write(" ".join(sentence) + "\t" + str(wb_perplexities[-1]) + "\n")
+            toWrite.append(" ".join(sentence) + "\t" + str(wb_perplexities[-1]))
             bar()
 
     wb_avg = sum(wb_perplexities) / len(wb_perplexities)
     print(f'Witten-Bell average perplexity: {wb_avg}')
-    # calculate perplexity for each sentence using Kneser-Ney smoothing
+    outputfile = open("2020115006_LM4_test-perplexity.txt", "w", encoding="utf-8")
+    outputfile.write(f"{wb_avg}\n")
+    outputfile.write("\n".join(toWrite))
     outputfile.close()
-    outputfile = open("2020115006_LM1_test-perplexity.txt", "w", encoding="utf-8")
+    # calculate perplexity for each sentence using Kneser-Ney smoothing
+
     kn_perplexities = []
+    toWrite = []
     with alive_bar(len(random_sentences)) as bar:
         for sentence in random_sentences:
             kn_perplexities.append(perplexity(ngramDicts, sentence, 'kn'))
             # sentence<space>perplexity
-            outputfile.write(" ".join(sentence) + "\t" + str(kn_perplexities[-1]) + "\n")
+            # outputfile.write(" ".join(sentence) + "\t" + str(kn_perplexities[-1]) + "\n")
+            toWrite.append(" ".join(sentence) + "\t" + str(kn_perplexities[-1]))
             bar()
 
     kn_avg = sum(kn_perplexities) / len(kn_perplexities)
 
     print(f'Kneser-Ney average perplexity: {kn_avg}')
-
+    outputfile = open("2020115006_LM3_test-perplexity.txt", "w", encoding="utf-8")
+    # write average perplexity at the top
+    outputfile.write(f'{kn_avg}\n')
+    outputfile.write("\n".join(toWrite))
     outputfile.close()
-    outputfile = open("2020115006_LM2_train-perplexity.txt", "w", encoding="utf-8")
+
     wb_perplexities = []
+    toWrite = []
     with alive_bar(len(trainLines)) as bar:
         for sentence in trainLines:
             wb_perplexities.append(perplexity(ngramDicts, sentence, 'wb'))
             # sentence<space>perplexity
-            outputfile.write(" ".join(sentence) + "\t" + str(wb_perplexities[-1]) + "\n")
+            # outputfile.write(" ".join(sentence) + "\t" + str(wb_perplexities[-1]) + "\n"
+            toWrite.append(" ".join(sentence) + "\t" + str(wb_perplexities[-1]))
             bar()
 
     wb_avg = sum(wb_perplexities) / len(wb_perplexities)
     print(f'Witten-Bell average perplexity: {wb_avg}')
     # calculate perplexity for each sentence using Kneser-Ney smoothing
+
+    # write average perplexity at the top
+    outputfile = open("2020115006_LM4_train-perplexity.txt", "w", encoding="utf-8")
+
+    outputfile.write(f'{wb_avg}\n')
+    outputfile.write("\n".join(toWrite))
     outputfile.close()
-    outputfile = open("2020115006_LM1_train-perplexity.txt", "w", encoding="utf-8")
+
     kn_perplexities = []
+    toWrite = []
     with alive_bar(len(trainLines)) as bar:
         for sentence in trainLines:
             kn_perplexities.append(perplexity(ngramDicts, sentence, 'kn'))
             # sentence<space>perplexity
-            outputfile.write(" ".join(sentence) + "\t" + str(kn_perplexities[-1]) + "\n")
+            # outputfile.write(" ".join(sentence) + "\t" + str(kn_perplexities[-1]) + "\n")
+            toWrite.append(" ".join(sentence) + "\t" + str(kn_perplexities[-1]))
             bar()
 
-    outputfile.close()
     kn_avg = sum(kn_perplexities) / len(kn_perplexities)
+    # seek to top
+    outputfile = open("2020115006_LM3_train-perplexity.txt", "w", encoding="utf-8")
+    # write average perplexity at the top
+    outputfile.write(f'{kn_avg}\n')
+    outputfile.write("\n".join(toWrite))
 
+    outputfile.close()
     print(f'Kneser-Ney average perplexity: {kn_avg}')
