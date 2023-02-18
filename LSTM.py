@@ -8,7 +8,7 @@ from alive_progress import alive_bar
 import numpy as np
 import random
 import time
-import argparse
+import sys
 
 MODEL = "LM6"
 
@@ -29,7 +29,7 @@ class Data(torch.utils.data.Dataset):
         self.sentences = sentences
         self.device = device
 
-        self.cutoff = 20
+        self.cutoff = 40
 
         self.Ssentences = [sentence for sentence in self.sentences if self.cutoff > len(sentence) > 0]
         self.Lsentences = [sentence for sentence in self.sentences if len(sentence) >= self.cutoff]
@@ -184,7 +184,7 @@ def train(model, data, optimizer, criterion, valDat, maxPat=5):
         epoch += 1
 
 
-def perplexity(data, model, sentence):
+def perplexity(model, sentence):
     sentence = get_token_list(sentence)
     if model.train_data is None:
         print("No training data")
@@ -193,6 +193,7 @@ def perplexity(data, model, sentence):
         if sentence[tokenIdx] not in model.train_data.vocabSet:
             sentence[tokenIdx] = "<unk>"
 
+    # print(sentence)
     sentence = torch.tensor([model.train_data.w2idx[token] for token in sentence], device=model.device)
     y = model(sentence[:-1])
     # print(y.shape)
@@ -214,7 +215,7 @@ def getPerpDataset(model, data: Data, filename: str):
     toWrite = []
     with alive_bar(len(data.sentences)) as bar:
         for sentence in data.sentences:
-            newPerp = perplexity(data, model, ' '.join(sentence))
+            newPerp = perplexity(model, ' '.join(sentence))
             # sentence<tab>perp
             toWrite.append(f"{' '.join(sentence)}\t{newPerp}")
             perp += newPerp
@@ -319,23 +320,21 @@ def runPerpAnalysis(path: str):
     criterion = nn.CrossEntropyLoss()
     train(model, train_data, optimizer, criterion, val_data, 4)
 
+    torch.save(model, f"2020115006_{MODEL}.pth")
+
     getPerpDataset(model, val_data, "val.log")
     getPerpDataset(model, test_data, f"2020115006_{MODEL}_test-perplexity.txt")
 
     getPerpDataset(model, train_data, f"2020115006_{MODEL}_train-perplexity.txt")
 
-    torch.save(model, f"2020115006_{MODEL}.pth")
-
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model", help="model to run")
-    args = parser.parse_args()
-    if args.model:
-        torch.load(args.model)
+
+    if len(sys.argv) == 2:
+        path = sys.argv[1]
         sent = input("input sentence: ")
-        tokens = get_token_list(sent)
-        # print(perplexity(
+        model = torch.load(path)
+        print(perplexity(model, sent))
         exit(0)
 
     MODEL = "LM5"
