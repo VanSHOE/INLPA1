@@ -3,6 +3,7 @@ import numpy as np
 from pprint import pprint
 import random
 import time
+import sys
 from alive_progress import alive_bar
 
 NGRAM_SIZE = 4
@@ -20,6 +21,7 @@ def get_token_list(in_text: str) -> list:
     in_text = in_text.lower()
     # tokenize hashtags
     in_text = re.sub(r"#(\w+)", r"<HASHTAG> ", in_text)
+    in_text = re.sub(r'\d+(,(\d+))*(\.(\d+))?%?\s', '<NUMBER> ', in_text)
     # tokenize mentions
     in_text = re.sub(r"@(\w+)", r"<MENTION> ", in_text)
     # tokenize urls
@@ -275,7 +277,7 @@ def witten_bell_smoothing(ngram_dict: dict, ngram: list) -> float:
     return first_term + second_term
 
 
-def sentence_likelihood(ngram_dict: dict, sentence: str, smoothing: str, kneserd=0.75) -> float:
+def sentence_likelihood(ngram_dict: dict, sentence: list, smoothing: str, kneserd=0.75) -> float:
     """
     Calculates the likelihood of the input sentence
     :param ngram_dict: n-gram dictionary
@@ -284,7 +286,8 @@ def sentence_likelihood(ngram_dict: dict, sentence: str, smoothing: str, kneserd
     :param kneserd: discounting factor for Kneser-Ney smoothing
     :return: likelihood of the sentence
     """
-    tokens = get_token_list(sentence)
+    # print(sentence)
+    tokens = sentence
     if smoothing == 'wb':
         likelihood = 1
         for i in range(len(tokens) - NGRAM_SIZE + 1):
@@ -297,7 +300,7 @@ def sentence_likelihood(ngram_dict: dict, sentence: str, smoothing: str, kneserd
         return likelihood
 
 
-def perplexity(ngram_dict: dict, sentence: str, smoothing: str, kneserd=0.75) -> float:
+def perplexity(ngram_dict: dict, sentence: list, smoothing: str, kneserd=0.75) -> float:
     """
     Calculates the perplexity of the input sentence
     :param ngram_dict: n-gram dictionary
@@ -308,32 +311,40 @@ def perplexity(ngram_dict: dict, sentence: str, smoothing: str, kneserd=0.75) ->
     """
     prob = sentence_likelihood(ngram_dict, sentence, smoothing, kneserd)
     # print(sentence, prob)
-    prob = max(prob, 1e-10)
+    prob = max(prob, 1e-15)
 
-    return pow(prob, -1 / len(get_token_list(sentence)))
+    return pow(prob, -1 / len(sentence))
 
 
 if __name__ == '__main__':
     # path = "corpus/Pride and Prejudice - Jane Austen.txt"
     path = "corpus/Ulysses - James Joyce.txt"
     in_text = open(path, "r", encoding="utf-8")
-    sentences = in_text.readlines()
+    sentences = in_text.read()
+    sentences = sentence_tokenizer(sentences, 1)
+    # remove all sentences with less than NGRAM_SIZE tokens
+    sentences = [sentence for sentence in sentences if len(sentence) >= NGRAM_SIZE]
     random.seed(time.time())
     random_sentences = random.sample(sentences, 1000)
     in_text.close()
 
     in_text = open(path, "r", encoding="utf-8")
-    trainLines = in_text.readlines()
+    trainLines = sentences.copy()
     # remove test lines from training lines
 
     for sentence in random_sentences:
         trainLines.remove(sentence)
 
-    combined_text = "".join(trainLines)
+    print(trainLines)
+    # combined_text = " ".join(" ".join(trainLines))
+    combined_text = ""
+    for line in trainLines:
+        combined_text += " ".join(line) + " "
 
-    for i in range(len(random_sentences)):
-        random_sentences[i] = random_sentences[i].strip()
-    random_sentences = [sentence for sentence in random_sentences if len(get_token_list(sentence)) >= NGRAM_SIZE]
+    # print(combined_text)
+    # exit(33)
+
+    random_sentences = [sentence for sentence in random_sentences if len(sentence) >= NGRAM_SIZE]
     tokens = rem_low_freq(get_token_list(combined_text), 1)
 
     for n in range(NGRAM_SIZE):
@@ -341,25 +352,56 @@ if __name__ == '__main__':
 
     # get 1000 random sentences from the corpus using random library
 
+    outputfile = open("2020115006_LM2_test-perplexity.txt", "w", encoding="utf-8")
     wb_perplexities = []
     with alive_bar(len(random_sentences)) as bar:
         for sentence in random_sentences:
             wb_perplexities.append(perplexity(ngramDicts, sentence, 'wb'))
+            # sentence<space>perplexity
+            outputfile.write(" ".join(sentence) + " " + str(wb_perplexities[-1]) + "\n")
             bar()
 
     wb_avg = sum(wb_perplexities) / len(wb_perplexities)
     print(f'Witten-Bell average perplexity: {wb_avg}')
     # calculate perplexity for each sentence using Kneser-Ney smoothing
+    outputfile.close()
+    outputfile = open("2020115006_LM1_test-perplexity.txt", "w", encoding="utf-8")
     kn_perplexities = []
     with alive_bar(len(random_sentences)) as bar:
         for sentence in random_sentences:
             kn_perplexities.append(perplexity(ngramDicts, sentence, 'kn'))
+            # sentence<space>perplexity
+            outputfile.write(" ".join(sentence) + " " + str(kn_perplexities[-1]) + "\n")
             bar()
 
-    # average
-    # print(wb_perplexities)
-    # print(kn_perplexities)
+    kn_avg = sum(kn_perplexities) / len(kn_perplexities)
 
+    print(f'Kneser-Ney average perplexity: {kn_avg}')
+
+    outputfile.close()
+    outputfile = open("2020115006_LM2_train-perplexity.txt", "w", encoding="utf-8")
+    wb_perplexities = []
+    with alive_bar(len(trainLines)) as bar:
+        for sentence in trainLines:
+            wb_perplexities.append(perplexity(ngramDicts, sentence, 'wb'))
+            # sentence<space>perplexity
+            outputfile.write(" ".join(sentence) + " " + str(wb_perplexities[-1]) + "\n")
+            bar()
+
+    wb_avg = sum(wb_perplexities) / len(wb_perplexities)
+    print(f'Witten-Bell average perplexity: {wb_avg}')
+    # calculate perplexity for each sentence using Kneser-Ney smoothing
+    outputfile.close()
+    outputfile = open("2020115006_LM1_train-perplexity.txt", "w", encoding="utf-8")
+    kn_perplexities = []
+    with alive_bar(len(trainLines)) as bar:
+        for sentence in trainLines:
+            kn_perplexities.append(perplexity(ngramDicts, sentence, 'kn'))
+            # sentence<space>perplexity
+            outputfile.write(" ".join(sentence) + " " + str(kn_perplexities[-1]) + "\n")
+            bar()
+
+    outputfile.close()
     kn_avg = sum(kn_perplexities) / len(kn_perplexities)
 
     print(f'Kneser-Ney average perplexity: {kn_avg}')
