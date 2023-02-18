@@ -9,6 +9,8 @@ from alive_progress import alive_bar
 NGRAM_SIZE = 4
 ngramDicts = {}
 
+MODEL = 1
+
 
 def get_token_list(in_text: str) -> list:
     """
@@ -184,7 +186,7 @@ def ngram_count(ngram_dict: dict, ngram: list) -> int:
     :return: count of the n-gram
     """
     cur_dict = ngram_dict[len(ngram)]
-    if n == 1:
+    if len(ngram) == 1:
         if ngram[0] in cur_dict:
             return cur_dict[ngram[0]]
         else:
@@ -296,12 +298,12 @@ def sentence_likelihood(ngram_dict: dict, sentence: list, smoothing: str, kneser
     """
     # print(sentence)
     tokens = sentence
-    if smoothing == 'wb':
+    if smoothing == 'w' or smoothing == 'wb':
         likelihood = 1
         for i in range(len(tokens) - NGRAM_SIZE + 1):
             likelihood *= witten_bell_smoothing(ngram_dict, tokens[i:i + NGRAM_SIZE])
         return likelihood
-    elif smoothing == 'kn':
+    elif smoothing == 'k' or smoothing == 'kn':
         likelihood = 1
         for i in range(len(tokens) - NGRAM_SIZE + 1):
             likelihood *= kneser_ney_smoothing(ngram_dict, kneserd, tokens[i:i + NGRAM_SIZE])
@@ -324,9 +326,8 @@ def perplexity(ngram_dict: dict, sentence: list, smoothing: str, kneserd=0.75) -
     return pow(prob, -1 / len(sentence))
 
 
-if __name__ == '__main__':
+def get_all_perps(path: str):
     # path = "corpus/Pride and Prejudice - Jane Austen.txt"
-    path = "corpus/Ulysses - James Joyce.txt"
     in_text = open(path, "r", encoding="utf-8")
     sentences = in_text.read()
     sentences = sentence_tokenizer(sentences, 1)
@@ -371,7 +372,7 @@ if __name__ == '__main__':
 
     wb_avg = sum(wb_perplexities) / len(wb_perplexities)
     print(f'Witten-Bell average perplexity: {wb_avg}')
-    outputfile = open("2020115006_LM4_test-perplexity.txt", "w", encoding="utf-8")
+    outputfile = open(f"2020115006_LM{MODEL + 1}_test-perplexity.txt", "w", encoding="utf-8")
     outputfile.write(f"{wb_avg}\n")
     outputfile.write("\n".join(toWrite))
     outputfile.close()
@@ -390,7 +391,7 @@ if __name__ == '__main__':
     kn_avg = sum(kn_perplexities) / len(kn_perplexities)
 
     print(f'Kneser-Ney average perplexity: {kn_avg}')
-    outputfile = open("2020115006_LM3_test-perplexity.txt", "w", encoding="utf-8")
+    outputfile = open(f"2020115006_LM{MODEL}_test-perplexity.txt", "w", encoding="utf-8")
     # write average perplexity at the top
     outputfile.write(f'{kn_avg}\n')
     outputfile.write("\n".join(toWrite))
@@ -411,7 +412,7 @@ if __name__ == '__main__':
     # calculate perplexity for each sentence using Kneser-Ney smoothing
 
     # write average perplexity at the top
-    outputfile = open("2020115006_LM4_train-perplexity.txt", "w", encoding="utf-8")
+    outputfile = open(f"2020115006_LM{MODEL + 1}_train-perplexity.txt", "w", encoding="utf-8")
 
     outputfile.write(f'{wb_avg}\n')
     outputfile.write("\n".join(toWrite))
@@ -429,10 +430,30 @@ if __name__ == '__main__':
 
     kn_avg = sum(kn_perplexities) / len(kn_perplexities)
     # seek to top
-    outputfile = open("2020115006_LM3_train-perplexity.txt", "w", encoding="utf-8")
+    outputfile = open(f"2020115006_LM{MODEL}_train-perplexity.txt", "w", encoding="utf-8")
     # write average perplexity at the top
     outputfile.write(f'{kn_avg}\n')
     outputfile.write("\n".join(toWrite))
 
     outputfile.close()
     print(f'Kneser-Ney average perplexity: {kn_avg}')
+
+
+if __name__ == '__main__':
+    args = sys.argv
+    if len(args) == 3:
+        smoothingAl = args[1]
+        path = args[2]
+        fullText = open(path, "r", encoding="utf-8").read()
+        tokens = rem_low_freq(get_token_list(fullText), 1)
+        ngramDicts = {}
+        for n in range(NGRAM_SIZE):
+            ngramDicts[n + 1] = construct_ngram(n + 1, tokens)
+        sentence = input("Enter sentence: ")
+        sentence = get_token_list(sentence)
+        print(perplexity(ngramDicts, sentence, smoothingAl))
+        exit(0)
+    MODEL = 1
+    get_all_perps("corpus/Pride and Prejudice - Jane Austen.txt")
+    MODEL = 3
+    get_all_perps("corpus/Ulysses - James Joyce.txt")
