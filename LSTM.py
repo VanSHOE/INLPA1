@@ -76,7 +76,7 @@ class Data(torch.utils.data.Dataset):
         self.sentencesIdx = torch.tensor([[self.w2idx[token] for token in sentence] for sentence in self.sentences],
                                          device=self.device)
 
-    def handle_unknowns(self, vocab_set):
+    def handle_unknowns(self, vocab_set, vocab):
         for i in range(len(self.sentences)):
             for j in range(len(self.sentences[i])):
                 if self.sentences[i][j] not in vocab_set:
@@ -86,8 +86,8 @@ class Data(torch.utils.data.Dataset):
                     if self.sentences[i][j] in self.vocabSet:
                         self.vocabSet.remove(self.sentences[i][j])
                     self.sentences[i][j] = "<unk>"
-        self.w2idx = {w: i for i, w in enumerate(self.vocab)}
-        self.idx2w = {i: w for i, w in enumerate(self.vocab)}
+        self.w2idx = {w: i for i, w in enumerate(vocab)}
+        self.idx2w = {i: w for i, w in enumerate(vocab)}
         self.sentencesIdx = torch.tensor([[self.w2idx[token] for token in sentence] for sentence in self.sentences],
                                          device=self.device)
 
@@ -308,8 +308,8 @@ if __name__ == '__main__':
     # split data
 
     model = LSTM(300, 300, 1, len(train_data.vocab), len(train_data.vocab))
-    test_data.handle_unknowns(train_data.vocabSet)
-    val_data.handle_unknowns(train_data.vocabSet)
+    test_data.handle_unknowns(train_data.vocabSet, train_data.vocab)
+    val_data.handle_unknowns(train_data.vocabSet, train_data.vocab)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     criterion = nn.CrossEntropyLoss()
