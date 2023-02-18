@@ -8,6 +8,7 @@ from alive_progress import alive_bar
 import numpy as np
 import random
 import time
+import argparse
 
 MODEL = "LM6"
 
@@ -166,9 +167,11 @@ def train(model, data, optimizer, criterion, valDat, maxPat=5):
 
             else:  # early stopping
                 print("Early stopping")
+                # model = torch.load(f"{MODEL}.pt")
                 model.load_state_dict(torch.load(f"{MODEL}.pt"))
                 lossDec = False
         else:
+            # torch.save(model, f"{MODEL}.pt")
             torch.save(model.state_dict(), f"{MODEL}.pt")
             es_patience = maxPat
         prevValLoss = validationLoss
@@ -190,7 +193,7 @@ def perplexity(data, model, sentence):
         if sentence[tokenIdx] not in model.train_data.vocabSet:
             sentence[tokenIdx] = "<unk>"
 
-    sentence = torch.tensor([data.w2idx[token] for token in sentence], device=model.device)
+    sentence = torch.tensor([model.train_data.w2idx[token] for token in sentence], device=model.device)
     y = model(sentence[:-1])
     # print(y.shape)
     probs = torch.nn.functional.softmax(y, dim=-1).cpu().detach().numpy()
@@ -201,7 +204,7 @@ def perplexity(data, model, sentence):
     return np.exp(perp / len(target.cpu().numpy()))
 
 
-def getPerpDataset(data: Data, filename: str):
+def getPerpDataset(model, data: Data, filename: str):
     model.eval()
 
     # check perplexity for each sentence in data
@@ -278,11 +281,11 @@ def getLossDataset(data: Data, model):
     return loss / len(dataL)
 
 
-if __name__ == '__main__':
+def runPerpAnalysis(path: str):
     # seed random with time
     random.seed(time.time())
 
-    fullText = open("./corpus/Ulysses - James Joyce.txt", "r", encoding='utf-8').read().lower()
+    fullText = open(path, "r", encoding='utf-8').read().lower()
     sentences = sentence_tokenizer(fullText, -1)
 
     sentences = [sentence for sentence in sentences if len(sentence) > 0]
@@ -316,7 +319,27 @@ if __name__ == '__main__':
     criterion = nn.CrossEntropyLoss()
     train(model, train_data, optimizer, criterion, val_data, 4)
 
-    getPerpDataset(val_data, "val.log")
-    getPerpDataset(test_data, f"2020115006_{MODEL}_test-perplexity.txt")
+    getPerpDataset(model, val_data, "val.log")
+    getPerpDataset(model, test_data, f"2020115006_{MODEL}_test-perplexity.txt")
 
-    getPerpDataset(train_data, f"2020115006_{MODEL}_train-perplexity.txt")
+    getPerpDataset(model, train_data, f"2020115006_{MODEL}_train-perplexity.txt")
+
+    torch.save(model, f"2020115006_{MODEL}.pth")
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", help="model to run")
+    args = parser.parse_args()
+    if args.model:
+        torch.load(args.model)
+        sent = input("input sentence: ")
+        tokens = get_token_list(sent)
+        # print(perplexity(
+        exit(0)
+
+    MODEL = "LM5"
+    runPerpAnalysis("./corpus/Pride and Prejudice - Jane Austen.txt")
+
+    MODEL = "LM6"
+    runPerpAnalysis("./corpus/Ulysses - James Joyce.txt")
