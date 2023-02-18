@@ -26,7 +26,7 @@ class Data(torch.utils.data.Dataset):
         self.sentences = sentences
         self.device = device
 
-        self.cutoff = 40
+        self.cutoff = 20
 
         self.Ssentences = [sentence for sentence in self.sentences if self.cutoff > len(sentence) > 0]
         self.Lsentences = [sentence for sentence in self.sentences if len(sentence) >= self.cutoff]
@@ -44,7 +44,7 @@ class Data(torch.utils.data.Dataset):
         print(len(self.sentences))
         self.vocab = set()
         self.mxSentSize = 0
-
+        # self.mxSentSize = 20
         for sentence in self.sentences:
             if len(sentence) not in sentenceLens:
                 sentenceLens[len(sentence)] = 1
@@ -80,8 +80,14 @@ class Data(torch.utils.data.Dataset):
         for i in range(len(self.sentences)):
             for j in range(len(self.sentences[i])):
                 if self.sentences[i][j] not in vocab_set:
+                    # remove from vocab and vocab set
+                    if self.sentences[i][j] in self.vocab:
+                        self.vocab.remove(self.sentences[i][j])
+                    if self.sentences[i][j] in self.vocabSet:
+                        self.vocabSet.remove(self.sentences[i][j])
                     self.sentences[i][j] = "<unk>"
-
+        self.w2idx = {w: i for i, w in enumerate(self.vocab)}
+        self.idx2w = {i: w for i, w in enumerate(self.vocab)}
         self.sentencesIdx = torch.tensor([[self.w2idx[token] for token in sentence] for sentence in self.sentences],
                                          device=self.device)
 
@@ -159,7 +165,7 @@ def train(model, data, optimizer, criterion, valDat, maxPat=5):
 
             else:  # early stopping
                 print("Early stopping")
-                model.load_state_dict(torch.load("model.pt"))
+                # model.load_state_dict(torch.load("model.pt"))
                 lossDec = False
         else:
             torch.save(model.state_dict(), "model.pt")
@@ -194,16 +200,19 @@ def perplexity(data, model, sentence):
     return np.exp(perp / len(target.cpu().numpy()))
 
 
-def getPerpDataset(data: Data):
+def getPerpDataset(data: Data, filename: str):
     model.eval()
 
     # check perplexity for each sentence in data
     perp = 0
     perps = {}
 
+    toWrite = []
     with alive_bar(len(data.sentences)) as bar:
         for sentence in data.sentences:
             newPerp = perplexity(data, model, ' '.join(sentence))
+            # sentence<tab>perp
+            toWrite.append(f"{' '.join(sentence)}\t{newPerp}")
             perp += newPerp
             if newPerp in perps:
                 perps[newPerp] += 1
@@ -211,6 +220,11 @@ def getPerpDataset(data: Data):
                 perps[newPerp] = 1
             bar()
 
+    output = open(filename, "w", encoding="utf-8")
+    output.write(f"{perp / len(data.sentences)}\n")
+    # write sentences
+    output.write('\n'.join(toWrite))
+    output.close()
     # print(perps)
     # histogram binned
     plt.hist(perps.keys(), bins=100)
@@ -284,22 +298,24 @@ if __name__ == '__main__':
         else:
             valText.append(sentence)
 
-    trainText = rem_low_freq_sentences(trainText, 1)
-    testText = rem_low_freq_sentences(testText, 1)
-    valText = rem_low_freq_sentences(valText, 1)
+    trainText = rem_low_freq_sentences(trainText, 3)
+
     train_data = Data(trainText)
     test_data = Data(testText)
     val_data = Data(valText)
+    # print sizes of all vocab
+    # exit(333)
     # split data
 
     model = LSTM(300, 300, 1, len(train_data.vocab), len(train_data.vocab))
     test_data.handle_unknowns(train_data.vocabSet)
     val_data.handle_unknowns(train_data.vocabSet)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     criterion = nn.CrossEntropyLoss()
-    train(model, train_data, optimizer, criterion, val_data, 5)
+    train(model, train_data, optimizer, criterion, val_data, 4)
 
-    getPerpDataset(val_data)
-    getPerpDataset(test_data)
+    getPerpDataset(val_data, "val.log")
+    getPerpDataset(test_data, "2020115006_LM5_test.txt")
 
-    getPerpDataset(train_data)
+    getPerpDataset(train_data, "2020115006_LM5_train.txt")
