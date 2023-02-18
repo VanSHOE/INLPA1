@@ -16,6 +16,8 @@ To run `LSTM.py` with an argument:
 
 `python LSTM.py /path/to/model.pth`
 
+It will then ask you to enter a sentence, and then output the perplexity of the sentence according to the specified
+smoothing method.
 To generate perplexity files for both the training and testing sets without an argument:
 
 `python LSTM.py`
@@ -31,7 +33,8 @@ to use.
 To run `smoothing.py` with arguments:
 
 `python smoothing.py k /path/to/corpus.txt` or `python smoothing.py w /path/to/corpus.txt`
-
+It will then ask you to enter a sentence, and then output the perplexity of the sentence according to the specified
+model.
 To generate perplexity files for both the training and testing sets without arguments:
 
 `python smoothing.py`
