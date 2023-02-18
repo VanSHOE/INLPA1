@@ -281,7 +281,7 @@ if __name__ == '__main__':
     # seed random with time
     random.seed(time.time())
 
-    fullText = open("./corpus/Pride and Prejudice - Jane Austen.txt", "r", encoding='utf-8').read().lower()
+    fullText = open("./corpus/Ulysses - James Joyce.txt", "r", encoding='utf-8').read().lower()
     sentences = sentence_tokenizer(fullText, -1)
 
     sentences = [sentence for sentence in sentences if len(sentence) > 0]
@@ -316,6 +316,6 @@ if __name__ == '__main__':
     train(model, train_data, optimizer, criterion, val_data, 4)
 
     getPerpDataset(val_data, "val.log")
-    getPerpDataset(test_data, "2020115006_LM5_test.txt")
+    getPerpDataset(test_data, "2020115006_LM6_test.txt")
 
-    getPerpDataset(train_data, "2020115006_LM5_train.txt")
+    getPerpDataset(train_data, "2020115006_LM6_train.txt")
