@@ -358,7 +358,7 @@ if __name__ == '__main__':
         for sentence in random_sentences:
             wb_perplexities.append(perplexity(ngramDicts, sentence, 'wb'))
             # sentence<space>perplexity
-            outputfile.write(" ".join(sentence) + " " + str(wb_perplexities[-1]) + "\n")
+            outputfile.write(" ".join(sentence) + "\t" + str(wb_perplexities[-1]) + "\n")
             bar()
 
     wb_avg = sum(wb_perplexities) / len(wb_perplexities)
@@ -371,7 +371,7 @@ if __name__ == '__main__':
         for sentence in random_sentences:
             kn_perplexities.append(perplexity(ngramDicts, sentence, 'kn'))
             # sentence<space>perplexity
-            outputfile.write(" ".join(sentence) + " " + str(kn_perplexities[-1]) + "\n")
+            outputfile.write(" ".join(sentence) + "\t" + str(kn_perplexities[-1]) + "\n")
             bar()
 
     kn_avg = sum(kn_perplexities) / len(kn_perplexities)
@@ -385,7 +385,7 @@ if __name__ == '__main__':
         for sentence in trainLines:
             wb_perplexities.append(perplexity(ngramDicts, sentence, 'wb'))
             # sentence<space>perplexity
-            outputfile.write(" ".join(sentence) + " " + str(wb_perplexities[-1]) + "\n")
+            outputfile.write(" ".join(sentence) + "\t" + str(wb_perplexities[-1]) + "\n")
             bar()
 
     wb_avg = sum(wb_perplexities) / len(wb_perplexities)
@@ -398,7 +398,7 @@ if __name__ == '__main__':
         for sentence in trainLines:
             kn_perplexities.append(perplexity(ngramDicts, sentence, 'kn'))
             # sentence<space>perplexity
-            outputfile.write(" ".join(sentence) + " " + str(kn_perplexities[-1]) + "\n")
+            outputfile.write(" ".join(sentence) + "\t" + str(kn_perplexities[-1]) + "\n")
             bar()
 
     outputfile.close()
