@@ -15,6 +15,8 @@ sentenceLens = {}
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
+BATCH_SIZE = 32
+
 
 # device = "cpu"
 
@@ -23,8 +25,11 @@ class Data(torch.utils.data.Dataset):
     def __init__(self, sentences):
         self.sentences = sentences
         self.device = device
-        self.Ssentences = [sentence for sentence in self.sentences if 40 > len(sentence) > 0]
-        self.Lsentences = [sentence for sentence in self.sentences if len(sentence) >= 40]
+
+        self.cutoff = 40
+
+        self.Ssentences = [sentence for sentence in self.sentences if self.cutoff > len(sentence) > 0]
+        self.Lsentences = [sentence for sentence in self.sentences if len(sentence) >= self.cutoff]
         # split long sentences into 2
         self.sentences = []
         for sentence in self.Lsentences:
@@ -33,7 +38,7 @@ class Data(torch.utils.data.Dataset):
             self.sentences.append(sentence[half:])
         self.sentences += self.Ssentences
 
-        self.sentences = [sentence for sentence in self.sentences if len(sentence) <= 40]
+        self.sentences = [sentence for sentence in self.sentences if len(sentence) <= self.cutoff]
 
         # print(self.sentences)
         print(len(self.sentences))
@@ -71,6 +76,15 @@ class Data(torch.utils.data.Dataset):
         self.sentencesIdx = torch.tensor([[self.w2idx[token] for token in sentence] for sentence in self.sentences],
                                          device=self.device)
 
+    def handle_unknowns(self, vocab_set):
+        for i in range(len(self.sentences)):
+            for j in range(len(self.sentences[i])):
+                if self.sentences[i][j] not in vocab_set:
+                    self.sentences[i][j] = "<unk>"
+
+        self.sentencesIdx = torch.tensor([[self.w2idx[token] for token in sentence] for sentence in self.sentences],
+                                         device=self.device)
+
     def __len__(self):
         return len(self.sentencesIdx)
 
@@ -87,6 +101,7 @@ class LSTM(nn.Module):
         self.hidden_size = hidden_size  # size of LSTM hidden state
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)  # LSTM layer
         self.decoder = nn.Linear(hidden_size, vocab_size)  # linear layer to map the hidden state to output classes
+        self.train_data = None
 
         self.elayer = nn.Embedding(vocab_size, input_size)
 
@@ -98,12 +113,7 @@ class LSTM(nn.Module):
 
         # Forward propagate through the LSTM layer
         out, _ = self.lstm(embeddings)  # out: tensor of shape (batch_size, seq_length, hidden_size)
-
-        # Pass the extracted output through the linear layer to map it to output classes
-        # decode for all time steps
-        # for i in range(out.size(1)):
-        #     out[:, i, :] = self.decoder(out[:, i, :])
-
+        out = nn.functional.dropout(out, p=0.1, training=self.training)
         return self.decoder(out)
 
 
@@ -111,16 +121,16 @@ def train(model, data, optimizer, criterion, valDat, maxPat=5):
     epoch_loss = 0
     model.train()
 
-    dataL = DataLoader(data, batch_size=32, shuffle=True)
+    dataL = DataLoader(data, batch_size=BATCH_SIZE, shuffle=True)
     lossDec = True
     prevLoss = 10000000
     prevValLoss = 10000000
     epoch = 0
     es_patience = maxPat
+    model.train_data = data
     while lossDec:
         epoch_loss = 0
         for i, (x, y) in enumerate(dataL):
-
             optimizer.zero_grad()
             x = x.to(model.device)
 
@@ -137,8 +147,8 @@ def train(model, data, optimizer, criterion, valDat, maxPat=5):
             epoch_loss += loss.item()
 
             # print loss every 100 batches
-            if i % 100 == 0:
-                print(f"Epoch {epoch + 1} Batch {i} loss: {loss.item()}")
+            # if i % 100 == 0:
+            #     print(f"Epoch {epoch + 1} Batch {i} loss: {loss.item()}")
 
         validationLoss = getLossDataset(valDat, model)
         print(f"Validation loss: {validationLoss}")
@@ -166,8 +176,11 @@ def train(model, data, optimizer, criterion, valDat, maxPat=5):
 
 def perplexity(data, model, sentence):
     sentence = get_token_list(sentence)
+    if model.train_data is None:
+        print("No training data")
+        return
     for tokenIdx in range(len(sentence)):
-        if sentence[tokenIdx] not in data.vocabSet:
+        if sentence[tokenIdx] not in model.train_data.vocabSet:
             sentence[tokenIdx] = "<unk>"
 
     sentence = torch.tensor([data.w2idx[token] for token in sentence], device=model.device)
@@ -187,6 +200,7 @@ def getPerpDataset(data: Data):
     # check perplexity for each sentence in data
     perp = 0
     perps = {}
+
     with alive_bar(len(data.sentences)) as bar:
         for sentence in data.sentences:
             newPerp = perplexity(data, model, ' '.join(sentence))
@@ -209,10 +223,29 @@ def getPerpDataset(data: Data):
     print(f"Median: {np.median(perpList)}")
 
 
+def rem_low_freq_sentences(sentences, freq):
+    dist = {}
+    for sentence in sentences:
+        for token in sentence:
+            if token in dist:
+                dist[token] += 1
+            else:
+                dist[token] = 1
+
+    # replace with unk
+    for sentence in sentences:
+        for tokenIdx in range(len(sentence)):
+            if dist[sentence[tokenIdx]] < freq:
+                sentence[tokenIdx] = "<unk>"
+
+    return sentences
+
+
 def getLossDataset(data: Data, model):
     model.eval()
 
-    dataL = DataLoader(data, batch_size=32, shuffle=True)
+    dataL = DataLoader(data, batch_size=BATCH_SIZE, shuffle=True)
+
     criterion = nn.CrossEntropyLoss()
     loss = 0
 
@@ -235,7 +268,7 @@ if __name__ == '__main__':
     random.seed(time.time())
 
     fullText = open("./corpus/Pride and Prejudice - Jane Austen.txt", "r", encoding='utf-8').read().lower()
-    sentences = sentence_tokenizer(fullText, 2)
+    sentences = sentence_tokenizer(fullText, -1)
 
     sentences = [sentence for sentence in sentences if len(sentence) > 0]
     # split train test validation using random
@@ -251,16 +284,22 @@ if __name__ == '__main__':
         else:
             valText.append(sentence)
 
+    trainText = rem_low_freq_sentences(trainText, 1)
+    testText = rem_low_freq_sentences(testText, 1)
+    valText = rem_low_freq_sentences(valText, 1)
     train_data = Data(trainText)
     test_data = Data(testText)
     val_data = Data(valText)
     # split data
 
-    model = LSTM(250, 250, 1, len(train_data.vocab), len(train_data.vocab))
+    model = LSTM(300, 300, 1, len(train_data.vocab), len(train_data.vocab))
+    test_data.handle_unknowns(train_data.vocabSet)
+    val_data.handle_unknowns(train_data.vocabSet)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
     criterion = nn.CrossEntropyLoss()
-    train(model, train_data, optimizer, criterion, val_data, 3)
+    train(model, train_data, optimizer, criterion, val_data, 5)
 
-    getPerpDataset(train_data)
     getPerpDataset(val_data)
     getPerpDataset(test_data)
+
+    getPerpDataset(train_data)
