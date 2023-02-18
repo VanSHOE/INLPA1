@@ -20,8 +20,9 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 BATCH_SIZE = 32
 
-
 # device = "cpu"
+
+CUT_OFF = 40
 
 
 class Data(torch.utils.data.Dataset):
@@ -29,7 +30,7 @@ class Data(torch.utils.data.Dataset):
         self.sentences = sentences
         self.device = device
 
-        self.cutoff = 40
+        self.cutoff = CUT_OFF
 
         self.Ssentences = [sentence for sentence in self.sentences if self.cutoff > len(sentence) > 0]
         self.Lsentences = [sentence for sentence in self.sentences if len(sentence) >= self.cutoff]
@@ -41,7 +42,7 @@ class Data(torch.utils.data.Dataset):
             self.sentences.append(sentence[half:])
         self.sentences += self.Ssentences
 
-        self.sentences = [sentence for sentence in self.sentences if len(sentence) <= self.cutoff]
+        self.sentences = [sentence + ["<eos>"] for sentence in self.sentences if len(sentence) <= self.cutoff]
 
         # print(self.sentences)
         print(len(self.sentences))
@@ -67,6 +68,9 @@ class Data(torch.utils.data.Dataset):
         if "<unk>" not in self.vocab:
             self.vocab.append("<unk>")
 
+        if "<eos>" not in self.vocab:
+            self.vocab.append("<eos>")
+
         self.vocabSet = set(self.vocab)
         self.w2idx = {w: i for i, w in enumerate(self.vocab)}
         self.idx2w = {i: w for i, w in enumerate(self.vocab)}
@@ -74,10 +78,10 @@ class Data(torch.utils.data.Dataset):
         # pad each sentence to 40
         for i in range(len(self.sentences)):
             # print(type(self.sentences[i]))
-            self.sentences[i] = ["<pad>"] * (self.mxSentSize - len(self.sentences[i])) + self.sentences[i]
-
+            self.sentences[i] = self.sentences[i] + ["<pad>"] * (self.mxSentSize - len(self.sentences[i]))
         self.sentencesIdx = torch.tensor([[self.w2idx[token] for token in sentence] for sentence in self.sentences],
                                          device=self.device)
+        self.padIdx = self.w2idx["<pad>"]
 
     def handle_unknowns(self, vocab_set, vocab):
         for i in range(len(self.sentences)):
@@ -160,7 +164,7 @@ def train(model, data, optimizer, criterion, valDat, maxPat=5):
 
         validationLoss = getLossDataset(valDat, model)
         print(f"Validation loss: {validationLoss}")
-        if validationLoss - epoch_loss / len(dataL) > 2:
+        if validationLoss - epoch_loss / len(dataL) > 5:
             print("Validation loss increased")
             if es_patience > 0:
                 es_patience -= 1
@@ -333,6 +337,7 @@ if __name__ == '__main__':
     if len(sys.argv) == 2:
         path = sys.argv[1]
         sent = input("input sentence: ")
+
         model = torch.load(path)
         print(perplexity(model, sent))
         exit(0)
