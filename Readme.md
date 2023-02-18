@@ -42,4 +42,5 @@ To generate perplexity files for both the training and testing sets without argu
 Note that the corpus files used in `smoothing.py` must be in plain text format and the program will tokenize it into
 sentences.
 
+Download models here: https://1drv.ms/u/s!AlS9diCw3ZVTpiXBiVm0SFe9goEe?e=y6zWlU
 

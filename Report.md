@@ -9,13 +9,13 @@ given sequence.
 The results are presented in the table below:
 
 | Model | Average Perplexity (Test) | Average Perplexity (Train) |
-|-------|---------------------------|-----------------------------|
-| LM1   | 135.274                   | 2.35                        |
-| LM2   | 135.253                   | 1.688                       |
-| LM3   | 728.453                   | 2.038                       |
-| LM4   | 728.41                    | 1.513                       |
-| LM5   | 270.96                    | 1.14344                     |
-| LM6   | 594.2416                  | 1.1314                      |
+|-------|---------------------------|----------------------------|
+| LM1   | 135.274                   | 2.35                       |
+| LM2   | 135.253                   | 1.688                      |
+| LM3   | 728.453                   | 2.038                      |
+| LM4   | 728.41                    | 1.513                      |
+| LM5   | 270.96                    | 1.14344                    |
+| LM6   | 594.2416                  | 1.1314                     |
 
 From the given information, it can be observed that LM2 and LM4 have the lowest average perplexity on the test set,
 which is indicative of their superior performance in predicting the test data. LM2 has a slightly lower perplexity than
@@ -55,7 +55,8 @@ Overall, these results suggest that the choice of model architecture and trainin
 on the performance of language models. It may be worth exploring other types of neural network architectures or
 optimization strategies to further improve the performance of these models.
 
-We observed that in most cases, the median perplexity was significantly lower than the mean perplexity in both the
+We observed that in most cases, the median perplexity was significantly lower (around 10 as opposed to the mean which
+is in 100s) than the mean perplexity in both the
 testing and training phases. This suggests that the distribution of perplexities was positively skewed, with a few
 outliers having very high perplexities. The mean was therefore influenced by the outliers, leading to a higher average
 perplexity. On the other hand, the median was a more robust measure of central tendency that was less sensitive to the
